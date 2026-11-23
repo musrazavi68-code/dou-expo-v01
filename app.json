@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Dou Expo",
+    "slug": "dou-expo-v2",
+    "version": "2.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#080B12"
+    },
+    "android": {
+      "package": "com.mrazavi.douexpo.v2",
+      "versionCode": 20,
+      "permissions": [
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#080B12"
+      }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Dou Expo برای ترکیب تصاویر به دسترسی گالری نیاز دارد.",
+          "cameraPermission": "Dou Expo برای ثبت نوردهی چندگانه به دوربین نیاز دارد."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "اجازه ذخیره تصاویر ساخته‌شده در گالری را بدهید.",
+          "savePhotosPermission": "اجازه ذخیره تصاویر ساخته‌شده در گالری را بدهید."
+        }
+      ]
+    ],
+    "extra": {
+      "appVersion": "2.0.0",
+      "developer": "M.Razavi"
+    }
+  }
+}

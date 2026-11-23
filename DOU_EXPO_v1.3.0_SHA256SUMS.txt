@@ -1,0 +1,3 @@
+ab0be0446160f734be544854afd3a7969095090787f26c8a09f7adab7a7f42cb  Dou_Expo_GitHub_Ready_v1.3.0.zip
+cbf913b3c27ed8316f053c31e69fa8a2a6428dd818a74ab62e4d73b050a3b4c2  DOU_EXPO_Graphics_Kit_v1.3.0.zip
+7dd24e18a7412d35f46b02056f3e532c66bf92d70cf22f68527f402ff0590fcd  Dou_Expo_Pattern_Library_50_v1.3.0.zip

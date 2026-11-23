@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: dou-expo-v2-${{ github.ref }}
+  group: dou-expo-v2-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 jobs:
   build:

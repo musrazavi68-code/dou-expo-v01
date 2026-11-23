@@ -42,7 +42,7 @@ This branch targets Expo SDK 54 / React Native 0.81 and builds a debug APK with 
 - Layer list, PNG export, gallery save/share and creator watermark.
 
 ### Build on GitHub
-Push to `dou-expo-v2-blendcamera` or manually run **Dou Expo V2 Android APK** from the Actions tab. The workflow runs dependency installation, Expo validation, Android prebuild and Gradle debug assembly, then uploads `Dou-Expo-V2.1.0-Android-APK`.
+Push to `dou-expo-v2-blendcamera` or manually run **Dou Expo V2 Android APK** from the Actions tab. The workflow runs dependency installation, Expo validation, Android prebuild and Gradle debug assembly, then uploads `Dou-Expo-V2.2.0-Android-APK`.
 
 ### Planned next engineering stages
 1. Subject-aware masks (person / animal / object segmentation) using an on-device segmentation model; this is not yet implemented in the current prototype.
@@ -52,3 +52,10 @@ Push to `dou-expo-v2-blendcamera` or manually run **Dou Expo V2 Android APK** fr
 5. Device testing for camera permissions, gallery access, export and sharing.
 
 Do not treat the APK as release-ready until the latest Actions run succeeds and the exported APK has been installed and tested on physical devices.
+
+
+## Version 2.2.0 build gate
+- Android versionCode: 22
+- CI now validates the Android JavaScript bundle with `expo export --platform android` before generating the native project.
+- APK artifact name: `Dou-Expo-V2.2.0-Android-APK`.
+- A successful CI run is required before the APK can be called installable.

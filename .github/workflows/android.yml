@@ -50,13 +50,13 @@ jobs:
           mkdir -p artifacts
           APK="$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)"
           test -n "$APK"
-          cp "$APK" artifacts/Dou-Expo-V2.2.0-debug.apk
-          test -s artifacts/Dou-Expo-V2.2.0-debug.apk
-          echo "APK size: $(stat -c%s artifacts/Dou-Expo-V2.2.0-debug.apk) bytes"
-          sha256sum artifacts/Dou-Expo-V2.2.0-debug.apk > artifacts/SHA256SUMS.txt
+          cp "$APK" artifacts/Dou-Expo-V2.2.1-debug.apk
+          test -s artifacts/Dou-Expo-V2.2.1-debug.apk
+          echo "APK size: $(stat -c%s artifacts/Dou-Expo-V2.2.1-debug.apk) bytes"
+          sha256sum artifacts/Dou-Expo-V2.2.1-debug.apk > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-V2.2.0-Android-APK
+          name: Dou-Expo-V2.2.1-Android-APK
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14

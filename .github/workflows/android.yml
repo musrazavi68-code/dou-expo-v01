@@ -24,6 +24,14 @@ jobs:
           java-version: '17'
       - name: Install dependencies
         run: npm install
+      - name: Diagnose Expo Android autolinking
+        run: |
+          echo '--- Expo and native module versions ---'
+          npm ls expo expo-modules-autolinking expo-modules-core --all || true
+          echo '--- Android autolinking search ---'
+          npx expo-modules-autolinking search --platform android || true
+          echo '--- Android autolinking resolution ---'
+          npx expo-modules-autolinking resolve --platform android || true
       - name: Validate Expo project
         run: npx expo install --check
       - name: Generate native Android project

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dou Expo",
     "slug": "dou-expo-v2",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "orientation": "default",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
@@ -11,7 +11,7 @@
     },
     "android": {
       "package": "com.mrazavi.douexpo.v2",
-      "versionCode": 22,
+      "versionCode": 23,
       "permissions": [
         "CAMERA"
       ]
@@ -51,7 +51,7 @@
       ]
     ],
     "extra": {
-      "appVersion": "2.2.0",
+      "appVersion": "2.2.1",
       "developer": "M.Razavi"
     }
   }

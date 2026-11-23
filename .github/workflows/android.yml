@@ -1,7 +1,7 @@
 name: Dou Expo V2 Android APK
 on:
   push:
-    branches: [dou-expo-v2-blendcamera]
+    branches: [dou-expo-v2-blendcamera, dou-expo-android8-compat]
   workflow_dispatch:
 permissions:
   contents: read

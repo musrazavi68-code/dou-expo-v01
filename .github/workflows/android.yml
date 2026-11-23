@@ -78,8 +78,12 @@ jobs:
           BADGING="$("$AAPT" dump badging "$APK")"
           echo "$BADGING" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
           echo "$BADGING" | grep -q "package: name='com.mrazavi.douexpo.v2' versionCode='24' versionName='2.2.2'" || { echo 'Unexpected application identity or version'; exit 1; }
-          echo "$BADGING" | grep -q "sdkVersion:'26'" || { echo 'APK minimum Android SDK is not 26 (Android 8.0)'; exit 1; }
-          echo 'Install compatibility gate passed: Android 8.0+, package identity and all ABIs verified.'
+          APKANALYZER="$(find "$SDK_DIR" -type f -name apkanalyzer 2>/dev/null | head -1)"
+          test -n "$APKANALYZER"
+          MIN_SDK="$("$APKANALYZER" manifest min-sdk "$APK")"
+          echo "APK minimum Android SDK: $MIN_SDK"
+          test "$MIN_SDK" = "26" || { echo "Expected minimum SDK 26 (Android 8.0), got: $MIN_SDK"; exit 1; }
+          echo 'Install compatibility gate passed: Android 8.0+, package identity and native ABIs verified.'
           ZIPALIGN="$(find "$SDK_DIR/build-tools" -type f -name zipalign 2>/dev/null | sort -V | tail -1)"
           test -n "$ZIPALIGN"
           "$ZIPALIGN" -c -v 4 "$APK"

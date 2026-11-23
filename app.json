@@ -5,7 +5,7 @@
     "version": "2.2.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "backgroundColor": "#080B12"
     },
@@ -13,12 +13,18 @@
       "package": "com.mrazavi.douexpo.v2",
       "versionCode": 22,
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO"
+        "CAMERA"
       ]
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
       [
         "expo-camera",
         {

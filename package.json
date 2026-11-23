@@ -32,6 +32,6 @@
     "node": ">=20.19.4"
   },
   "overrides": {
-    "expo-font": "14.0.12"
+    "expo-font": "$expo-font"
   }
 }

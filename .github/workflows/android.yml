@@ -34,23 +34,27 @@ jobs:
           npx expo-modules-autolinking resolve --platform android || true
       - name: Validate Expo project
         run: npx expo install --check
+      - name: Bundle Android JavaScript
+        run: npx expo export --platform android --output-dir dist-check
       - name: Generate native Android project
         run: CI=1 npx expo prebuild --platform android --clean
       - name: Build debug APK
+        env:
+          GRADLE_OPTS: -Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug
+          ./gradlew --no-daemon --max-workers=2 --stacktrace assembleDebug
       - name: Collect APK
         run: |
           mkdir -p artifacts
           APK="$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)"
           test -n "$APK"
-          cp "$APK" artifacts/Dou-Expo-V2.1.0-debug.apk
+          cp "$APK" artifacts/Dou-Expo-V2.2.0-debug.apk
           sha256sum artifacts/Dou-Expo-V2.1.0-debug.apk > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-V2.1.0-Android-APK
+          name: Dou-Expo-V2.2.0-Android-APK
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14

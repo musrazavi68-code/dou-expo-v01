@@ -22,14 +22,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Install dependencies
         run: npm install
+      - name: Validate Expo project
+        run: npx expo install --check
       - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive
+        run: CI=1 npx expo prebuild --platform android --clean
       - name: Build debug APK
         run: |
           cd android
@@ -40,11 +38,11 @@ jobs:
           mkdir -p artifacts
           APK="$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)"
           test -n "$APK"
-          cp "$APK" artifacts/Dou-Expo-V2-debug.apk
-          sha256sum artifacts/Dou-Expo-V2-debug.apk > artifacts/SHA256SUMS.txt
+          cp "$APK" artifacts/Dou-Expo-V2.1.0-debug.apk
+          sha256sum artifacts/Dou-Expo-V2.1.0-debug.apk > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-V2-Android-APK
+          name: Dou-Expo-V2.1.0-Android-APK
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14

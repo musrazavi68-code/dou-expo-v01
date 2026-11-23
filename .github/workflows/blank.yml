@@ -116,7 +116,9 @@ jobs:
             echo "::error::Android sdkmanager was not found on the runner."
             exit 1
           fi
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
           "$SDKMANAGER" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Install npm dependencies

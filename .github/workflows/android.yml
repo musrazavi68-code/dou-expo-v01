@@ -38,16 +38,14 @@ jobs:
         run: npx expo export --platform android --output-dir dist-check
       - name: Generate native Android project
         run: CI=1 npx expo prebuild --platform android --clean
-      - name: Restrict native ABIs for Android phones
+      - name: Configure all Android ABIs
         run: |
-          echo '--- Before override ---'
-          grep -n '^reactNativeArchitectures=' android/gradle.properties || true
           if grep -q '^reactNativeArchitectures=' android/gradle.properties; then
-            sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=armeabi-v7a,arm64-v8a/' android/gradle.properties
+            sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64/' android/gradle.properties
           else
-            echo 'reactNativeArchitectures=armeabi-v7a,arm64-v8a' >> android/gradle.properties
+            echo 'reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64' >> android/gradle.properties
           fi
-          echo '--- Effective native ABIs ---'
+          echo '--- Required native ABIs ---'
           grep '^reactNativeArchitectures=' android/gradle.properties
       - name: Build debug APK
         env:
@@ -61,16 +59,17 @@ jobs:
           mkdir -p artifacts
           APK="$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)"
           test -n "$APK"
-          cp "$APK" artifacts/Dou-Expo-V2.2.1-debug.apk
-          test -s artifacts/Dou-Expo-V2.2.1-debug.apk
-          echo "APK size: $(stat -c%s artifacts/Dou-Expo-V2.2.1-debug.apk) bytes"
-          APK="$PWD/artifacts/Dou-Expo-V2.2.1-debug.apk"
+          cp "$APK" artifacts/Dou-Expo-V2.2.2-debug.apk
+          test -s artifacts/Dou-Expo-V2.2.2-debug.apk
+          echo "APK size: $(stat -c%s artifacts/Dou-Expo-V2.2.2-debug.apk) bytes"
+          APK="$PWD/artifacts/Dou-Expo-V2.2.2-debug.apk"
           echo '--- APK native ABI inventory ---'
           unzip -Z1 "$APK" | awk -F/ '$1 == "lib" {print $2}' | sort -u
           APK_ENTRIES="$(unzip -Z1 "$APK")"
-          echo "$APK_ENTRIES" | grep -q '^lib/arm64-v8a/' || { echo 'Missing required ABI: arm64-v8a'; exit 1; }
-          echo "$APK_ENTRIES" | grep -q '^lib/armeabi-v7a/' || { echo 'Missing required ABI: armeabi-v7a'; exit 1; }
-          echo 'Required Android phone ABIs are present.'
+          for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
+            echo "$APK_ENTRIES" | grep -q "^lib/$ABI/" || { echo "Missing required ABI: $ABI"; exit 1; }
+          done
+          echo 'All four Android ABIs are present.'
           ABI_LIST="$(echo "$APK_ENTRIES" | awk -F/ '$1 == "lib" {print $2}' | sort -u | tr '\n' ' ')"
           echo "All packaged ABIs: $ABI_LIST"
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
@@ -78,13 +77,19 @@ jobs:
           AAPT="$(find "$SDK_DIR/build-tools" -type f \( -name aapt -o -name aapt2 \) 2>/dev/null | sort -V | tail -1)"
           test -n "$APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
-          if [ -n "$AAPT" ]; then
-            "$AAPT" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
-          fi
+          test -n "$AAPT"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          echo "$BADGING" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
+          echo "$BADGING" | grep -q "package: name='com.mrazavi.douexpo.v2' versionCode='24' versionName='2.2.2'" || { echo 'Unexpected application identity or version'; exit 1; }
+          echo "$BADGING" | grep -q "sdkVersion:'26'" || { echo 'APK minimum Android SDK is not 26 (Android 8.0)'; exit 1; }
+          echo 'Install compatibility gate passed: Android 8.0+, package identity and all ABIs verified.'
+          ZIPALIGN="$(find "$SDK_DIR/build-tools" -type f -name zipalign 2>/dev/null | sort -V | tail -1)"
+          test -n "$ZIPALIGN"
+          "$ZIPALIGN" -c -v 4 "$APK"
           sha256sum "$APK" > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-V2.2.1-Android-APK
+          name: Dou-Expo-V2.2.2-Android-APK
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14

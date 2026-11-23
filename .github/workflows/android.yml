@@ -38,6 +38,17 @@ jobs:
         run: npx expo export --platform android --output-dir dist-check
       - name: Generate native Android project
         run: CI=1 npx expo prebuild --platform android --clean
+      - name: Restrict native ABIs for Android phones
+        run: |
+          echo '--- Before override ---'
+          grep -n '^reactNativeArchitectures=' android/gradle.properties || true
+          if grep -q '^reactNativeArchitectures=' android/gradle.properties; then
+            sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=armeabi-v7a,arm64-v8a/' android/gradle.properties
+          else
+            echo 'reactNativeArchitectures=armeabi-v7a,arm64-v8a' >> android/gradle.properties
+          fi
+          echo '--- Effective native ABIs ---'
+          grep '^reactNativeArchitectures=' android/gradle.properties
       - name: Build debug APK
         env:
           GRADLE_OPTS: -Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
@@ -53,7 +64,20 @@ jobs:
           cp "$APK" artifacts/Dou-Expo-V2.2.1-debug.apk
           test -s artifacts/Dou-Expo-V2.2.1-debug.apk
           echo "APK size: $(stat -c%s artifacts/Dou-Expo-V2.2.1-debug.apk) bytes"
-          sha256sum artifacts/Dou-Expo-V2.2.1-debug.apk > artifacts/SHA256SUMS.txt
+          APK="$PWD/artifacts/Dou-Expo-V2.2.1-debug.apk"
+          echo '--- APK native ABI inventory ---'
+          unzip -Z1 "$APK" | awk -F/ '/^lib\\// {print $2}' | sort -u
+          ABI_COUNT="$(unzip -Z1 "$APK" | awk -F/ '/^lib\\// {print $2}' | sort -u | wc -l)"
+          test "$ABI_COUNT" -eq 2
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER="$(find "$SDK_DIR/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -1)"
+          AAPT="$(find "$SDK_DIR/build-tools" -type f \( -name aapt -o -name aapt2 \) 2>/dev/null | sort -V | tail -1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          if [ -n "$AAPT" ]; then
+            "$AAPT" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
+          fi
+          sha256sum "$APK" > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Dou-Expo-V2.2.1-Android-APK

@@ -41,9 +41,9 @@ jobs:
       - name: Configure all Android ABIs
         run: |
           if grep -q '^reactNativeArchitectures=' android/gradle.properties; then
-            sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64/' android/gradle.properties
+            sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=armeabi-v7a,arm64-v8a/' android/gradle.properties
           else
-            echo 'reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64' >> android/gradle.properties
+            echo 'reactNativeArchitectures=armeabi-v7a,arm64-v8a' >> android/gradle.properties
           fi
           echo '--- Required native ABIs ---'
           grep '^reactNativeArchitectures=' android/gradle.properties
@@ -66,12 +66,12 @@ jobs:
           echo '--- APK native ABI inventory ---'
           unzip -Z1 "$APK" | awk -F/ '$1 == "lib" {print $2}' | sort -u
           APK_ENTRIES="$(unzip -Z1 "$APK")"
-          for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
+          for ABI in armeabi-v7a arm64-v8a; do
             echo "$APK_ENTRIES" | grep -q "^lib/$ABI/" || { echo "Missing required ABI: $ABI"; exit 1; }
           done
-          echo 'All four Android ABIs are present.'
+          echo 'Both Android phone ABIs are present.'
           ABI_LIST="$(echo "$APK_ENTRIES" | awk -F/ '$1 == "lib" {print $2}' | sort -u | tr '\n' ' ')"
-          echo "All packaged ABIs: $ABI_LIST"
+          echo "Packaged Android phone ABIs: $ABI_LIST"
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           APKSIGNER="$(find "$SDK_DIR/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -1)"
           AAPT="$(find "$SDK_DIR/build-tools" -type f \( -name aapt -o -name aapt2 \) 2>/dev/null | sort -V | tail -1)"

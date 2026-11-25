@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
@@ -263,7 +263,12 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
       final bytes = await _renderPngBytes();
       if (bytes == null) return;
       final file = await _writePngFile(bytes);
-      if (file != null) await Share.shareXFiles([XFile(file.path)],text:'Created with Dou expo Beta · $_selectedFilterName');
+      if (file != null) {
+        await SharePlus.instance.share(ShareParams(
+          files: [XFile(file.path)],
+          text: 'Created with Dou expo Beta · $_selectedFilterName',
+        ));
+      }
     } catch (e) { _message('Share failed: $e'); }
     finally { if (mounted) setState(() => _isExporting = false); }
   }

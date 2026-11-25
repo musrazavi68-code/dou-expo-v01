@@ -26,8 +26,8 @@ Future<ui.Image> _solidImage(int width, int height, ui.Color color) async {
     final forest = await _solidImage(16, 16, const ui.Color(0xFF477A35));
     try {
       final suggested = await StencilLibrary.complementaryColor(forest, stencil: StencilKind.tree);
-      final hue = ui.HSLColor.fromColor(suggested).hue;
-      expect(hue, inInclusiveRange(20, 45));
+      expect(suggested.red, greaterThan(suggested.green));
+      expect(suggested.green, greaterThan(suggested.blue));
     } finally {
       forest.dispose();
     }

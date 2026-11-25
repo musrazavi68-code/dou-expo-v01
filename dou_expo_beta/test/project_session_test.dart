@@ -91,6 +91,40 @@ void main() {
     expect(session.isDirty, isFalse);
   });
 
+  test('latest overlapping open request wins', () async {
+    final firstGate = Completer<ProjectDocument?>();
+    final session = ProjectSession.withBackend(
+      initial: doc('Initial'),
+      persist: (_) async {},
+      restore: (id) async {
+        if (id == 'first') return firstGate.future;
+        return ProjectDocument(
+          id: id,
+          name: id,
+          createdAt: DateTime.utc(2026),
+          updatedAt: DateTime.utc(2026),
+          canvas: const {},
+          layers: const [],
+        );
+      },
+      writeAsset: (_, __, ___) async => 'assets/test.png',
+    );
+
+    final firstOpen = session.open('first');
+    expect(await session.open('second'), isTrue);
+    firstGate.complete(ProjectDocument(
+      id: 'first',
+      name: 'first',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+      canvas: const {},
+      layers: const [],
+    ));
+
+    expect(await firstOpen, isFalse);
+    expect(session.document.id, 'second');
+  });
+
   test('asset writer uses the active project id', () async {
     String? receivedId;
     final session = ProjectSession.withBackend(

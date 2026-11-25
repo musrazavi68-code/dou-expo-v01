@@ -94,6 +94,24 @@ class ProjectDocument {
     );
   }
 
+  ProjectDocument copyWith({
+    String? name,
+    DateTime? updatedAt,
+    Map<String, Object?>? canvas,
+    List<LayerDocument>? layers,
+    String? activeLayerId,
+    bool clearActiveLayerId = false,
+  }) => ProjectDocument(
+    id: id,
+    name: name ?? this.name,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? DateTime.now().toUtc(),
+    canvas: canvas ?? this.canvas,
+    layers: layers ?? this.layers,
+    activeLayerId: clearActiveLayerId ? null : (activeLayerId ?? this.activeLayerId),
+    schemaVersion: schemaVersion,
+  );
+
   String encode() => jsonEncode(toJson());
   factory ProjectDocument.decode(String source) =>
       ProjectDocument.fromJson(Map<String, Object?>.from(jsonDecode(source) as Map));
@@ -141,6 +159,33 @@ class LayerDocument {
   final double exposure;
   final List<Map<String, Object?>> maskStrokes;
   final Map<String, Object?> settings;
+
+  LayerDocument copyWith({
+    String? name,
+    String? assetPath,
+    bool? visible,
+    double? opacity,
+    String? blendMode,
+    double? offsetX,
+    double? offsetY,
+    double? scale,
+    double? exposure,
+    List<Map<String, Object?>>? maskStrokes,
+    Map<String, Object?>? settings,
+  }) => LayerDocument(
+    id: id,
+    name: name ?? this.name,
+    assetPath: assetPath ?? this.assetPath,
+    visible: visible ?? this.visible,
+    opacity: opacity ?? this.opacity,
+    blendMode: blendMode ?? this.blendMode,
+    offsetX: offsetX ?? this.offsetX,
+    offsetY: offsetY ?? this.offsetY,
+    scale: scale ?? this.scale,
+    exposure: exposure ?? this.exposure,
+    maskStrokes: maskStrokes ?? this.maskStrokes,
+    settings: settings ?? this.settings,
+  );
 
   Map<String, Object?> toJson() => {
     'id': id, 'name': name, 'assetPath': assetPath, 'visible': visible,

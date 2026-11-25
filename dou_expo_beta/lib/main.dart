@@ -117,9 +117,23 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  }
  void _toast(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
  Future<void> _load(bool second) async {
-  final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);if(x==null)return;
-  try{final im=await ExposureComposer.decode(await File(x.path).readAsBytes());if(!mounted){im.dispose();return;}
-   setState((){if(second){_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}else{_base?.dispose();_base=im;}});
+  final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);
+  if(x==null)return;
+  try{
+   final bytes=await File(x.path).readAsBytes();
+   final im=await ExposureComposer.decode(bytes);
+   if(!mounted){im.dispose();return;}
+   final stamp=DateTime.now().microsecondsSinceEpoch;
+   final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
+   final layerId=second?'overlay_$stamp':'base_$stamp';
+   final current=widget.session.document;
+   widget.session.replace(current.copyWith(
+    layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],
+    activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'doubleExposure'}));
+   setState((){
+    if(second){_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}
+    else{_base?.dispose();_base=im;}
+   });
    if(!second){final c=_camera;_camera=null;_cameraOpen=false;_cameraReady=false;await c?.dispose();}
   }catch(e){_toast('Image load failed: '+e.toString());}
  }
@@ -129,15 +143,29 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   catch(e){_toast('Exposure compensation unavailable: '+e.toString());}
  }
  Future<void> _capture() async {
-  final c=_camera;if(c==null||!c.value.isInitialized||_capturePending){_toast('Camera not ready');return;}
+  final c=_camera;
+  if(c==null||!c.value.isInitialized||_capturePending){_toast('Camera not ready');return;}
   try{
    if(_selfTimer>0){setState(()=>_capturePending=true);_toast('Capture in '+_selfTimer.toString()+' seconds');await Future.delayed(Duration(seconds:_selfTimer));}
    if(!mounted||_camera!=c)return;
-   final x=await c.takePicture();final im=await ExposureComposer.decode(await File(x.path).readAsBytes());
+   final x=await c.takePicture();
+   final bytes=await File(x.path).readAsBytes();
+   final im=await ExposureComposer.decode(bytes);
    if(!mounted){im.dispose();return;}
-   setState((){if(_base==null){_base=im;}else{_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}});
+   final second=_base!=null;
+   final stamp=DateTime.now().microsecondsSinceEpoch;
+   final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
+   final layerId=second?'overlay_$stamp':'base_$stamp';
+   final current=widget.session.document;
+   widget.session.replace(current.copyWith(
+    layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],
+    activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'doubleExposure'}));
+   setState((){
+    if(!second){_base=im;}else{_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}
+   });
    _camera=null;_cameraOpen=false;_cameraReady=false;await c.dispose();
-  }catch(e){_toast('Capture failed: '+e.toString());}finally{if(mounted)setState(()=>_capturePending=false);}
+  }catch(e){_toast('Capture failed: '+e.toString());}
+  finally{if(mounted)setState(()=>_capturePending=false);}
  }
  Future<void> _toggleCamera() async {
   if(_cameraOpen){final c=_camera;_camera=null;setState((){_cameraOpen=false;_cameraReady=false;});await c?.dispose();}

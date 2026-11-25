@@ -123,14 +123,16 @@ class ProjectSession extends ChangeNotifier {
     // notifyListeners can re-enter save() through an observer.
     final operation = Future<void>.microtask(_saveUntilClean);
     _saveFuture = operation;
+    // Publish the saving state synchronously after installing the shared
+    // future, so observers can safely re-enter save() and join this writer.
+    _saving = true;
+    notifyListeners();
     return operation.whenComplete(() {
       if (identical(_saveFuture, operation)) _saveFuture = null;
     });
   }
 
   Future<void> _saveUntilClean() async {
-    _saving = true;
-    notifyListeners();
     try {
       var firstPass = true;
       while (firstPass || _dirty) {

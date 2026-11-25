@@ -9,7 +9,7 @@ void main() {
       id: 'project-1', name: 'Night study', createdAt: now, updatedAt: now,
       canvas: const {'width': 3000, 'height': 2000, 'ratio': '3:2'},
       activeLayerId: 'layer-2',
-      layers: const [
+      layers: [
         LayerDocument(id: 'layer-1', name: 'Base', assetPath: 'assets/base.jpg'),
         LayerDocument(
           id: 'layer-2', name: 'Exposure two', assetPath: 'assets/second.jpg',
@@ -27,6 +27,63 @@ void main() {
     expect(restored.layers[1].maskStrokes.single['points'], [[.1, .2], [.4, .6]]);
     expect(restored.layers[1].settings['contrast'], 1.2);
     expect(restored.activeLayerId, 'layer-2');
+  });
+
+  test('project and nested layer data are deeply immutable', () {
+    final points = <List<double>>[[.1, .2]];
+    final stroke = <String, Object?>{'points': points};
+    final settings = <String, Object?>{'recipe': {'grain': .3}};
+    final layer = LayerDocument(
+      id: 'immutable-layer',
+      name: 'Mask',
+      assetPath: 'assets/mask.png',
+      maskStrokes: [stroke],
+      settings: settings,
+    );
+    final canvas = <String, Object?>{'metadata': {'tags': ['one']}};
+    final project = ProjectDocument(
+      id: 'immutable-project',
+      name: 'Immutable',
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+      canvas: canvas,
+      layers: [layer],
+    );
+
+    points[0][0] = .9;
+    stroke['erase'] = true;
+    settings['recipe'] = 'changed';
+    canvas['metadata'] = 'changed';
+
+    expect((project.layers.single.maskStrokes.single['points'] as List).first, [.1, .2]);
+    expect(project.layers.single.maskStrokes.single.containsKey('erase'), isFalse);
+    expect(project.layers.single.settings['recipe'], {'grain': .3});
+    expect(project.canvas['metadata'], {'tags': ['one']});
+    expect(() => project.canvas['new'] = true, throwsUnsupportedError);
+    expect(() => project.layers.clear(), throwsUnsupportedError);
+  });
+
+  test('invalid opacity, scale and active layer are rejected', () {
+    expect(
+      () => LayerDocument(id: 'x', name: 'X', assetPath: 'assets/x.png', opacity: 2),
+      throwsArgumentError,
+    );
+    expect(
+      () => LayerDocument(id: 'x', name: 'X', assetPath: 'assets/x.png', scale: 0),
+      throwsArgumentError,
+    );
+    expect(
+      () => ProjectDocument(
+        id: 'p',
+        name: 'P',
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+        canvas: const {},
+        layers: const [],
+        activeLayerId: 'missing',
+      ),
+      throwsArgumentError,
+    );
   });
 
   test('unknown schema version is rejected instead of silently corrupted', () {

@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 import 'core/project_document.dart';
 import 'core/project_session.dart';
+import 'core/project_store.dart';
 
 const _ink=Color(0xFF100C0B);
 const _yellow=Color(0xFFFACC15);
@@ -154,8 +155,25 @@ class DarkroomScreen extends StatefulWidget {
  @override State<DarkroomScreen> createState()=>_DarkroomScreenState();
 }
 class _DarkroomScreenState extends State<DarkroomScreen> {
- final _picker=ImagePicker();XFile? _photo;
+ final _picker=ImagePicker();XFile? _photo;Uint8List? _photoBytes;
+ String? _loadedDarkroomPath;int _restoreToken=0;
  double _brightness=0,_contrast=1,_saturation=1;
+ @override void initState(){super.initState();widget.session.addListener(_onProjectChanged);_restoreDarkroom();}
+ @override void dispose(){widget.session.removeListener(_onProjectChanged);_restoreToken++;super.dispose();}
+ void _onProjectChanged(){_restoreDarkroom();}
+ Future<void> _restoreDarkroom() async {
+  final token=++_restoreToken;final project=widget.session.document;
+  final layers=project.layers.where((v)=>v.name=='Darkroom source').toList();
+  final path=layers.isEmpty?null:layers.last.assetPath;
+  try{
+   Uint8List? bytes;
+   if(path!=null&&path!=_loadedDarkroomPath){final file=await ProjectStore().resolveAsset(project.id,path);bytes=await file.readAsBytes();}
+   if(token!=_restoreToken||!mounted)return;
+   final raw=project.canvas['darkroom'];
+   if(raw is Map){final settings=Map<String,Object?>.from(raw);_brightness=(settings['brightness'] as num?)?.toDouble()??_brightness;_contrast=(settings['contrast'] as num?)?.toDouble()??_contrast;_saturation=(settings['saturation'] as num?)?.toDouble()??_saturation;}
+   if(path==null||bytes!=null){setState(()=>{_photoBytes=bytes;_loadedDarkroomPath=path;});}
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Darkroom restore failed: $e')));}
+ }
  Future<void> _pick() async {
   final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);
   if(x==null)return;
@@ -165,10 +183,11 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
    final assetPath=await widget.session.addAsset('darkroom_$stamp.jpg',bytes);
    final current=widget.session.document;
    final layerId='darkroom_$stamp';
+   _loadedDarkroomPath=assetPath;
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:'Darkroom source',assetPath:assetPath,settings:{'mode':'darkroom'})],
     activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'darkroom'}));
-   if(mounted)setState(()=>_photo=x);
+   if(mounted)setState(()=>{_photo=x,_photoBytes=bytes});
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Project import failed: $e')));}
  }
  Future<void> _export() async {
@@ -213,7 +232,7 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
  @override Widget build(BuildContext context)=>Scaffold(backgroundColor:_ink,
   appBar:AppBar(backgroundColor:_ink,title:const Text('DARKROOM',style:TextStyle(fontSize:13,letterSpacing:2,fontWeight:FontWeight.w700)),actions:[IconButton(onPressed:_pick,icon:const Icon(Icons.add_photo_alternate_outlined))]),
   body:SafeArea(child:Column(children:[
-   Expanded(child:Padding(padding:const EdgeInsets.all(12),child:ClipRRect(borderRadius:BorderRadius.circular(16),child:Center(child:_photo==null?const Text('Choose a photograph to develop',style:TextStyle(color:Colors.white54)):ColorFiltered(colorFilter:ColorFilter.matrix(_matrix()),child:Image.file(File(_photo!.path),fit:BoxFit.contain)))))),
+   Expanded(child:Padding(padding:const EdgeInsets.all(12),child:ClipRRect(borderRadius:BorderRadius.circular(16),child:Center(child:_photoBytes==null?const Text('Choose a photograph to develop',style:TextStyle(color:Colors.white54)):ColorFiltered(colorFilter:ColorFilter.matrix(_matrix()),child:Image.memory(_photoBytes!,fit:BoxFit.contain)))))),
    Padding(padding:const EdgeInsets.fromLTRB(16,4,16,20),child:Column(children:[
     _control('BRIGHTNESS',_brightness,-1,1,(v)=>setState(()=>_brightness=v)),
     _control('CONTRAST',_contrast,0,2,(v)=>setState(()=>_contrast=v)),

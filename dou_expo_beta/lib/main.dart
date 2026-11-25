@@ -43,6 +43,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  StencilFillMode _stencilFill=StencilFillMode.photo;
  Color _stencilTint=const Color(0xFFFF8A00);
  bool _tintReady=false;
+ double _contrast=1,_saturation=1,_effectAmount=.35;
+ FilmEffect _filmEffect=FilmEffect.none;
  int _blend=0,_cameraIndex=0;
  OverlayMaskMode _maskMode=OverlayMaskMode.fullFrame;
  static const _modes=< (String,BlendMode) >[
@@ -101,7 +103,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final h=(r>=1?math.max(1,(side/r).round()):side).toInt();
   return ExposureComposer.renderPng(base:b,overlay:_overlay,width:w,height:h,
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes,stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint);
+   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes,stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint,contrast:_contrast,saturation:_saturation,filmEffect:_filmEffect,effectAmount:_effectAmount);
  }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
@@ -141,7 +143,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     trailing:_blend==i?const Icon(Icons.check,color:Color(0xFFFACC15)):null,
     onTap:(){setState(()=>_blend=i);Navigator.pop(ctx);})
   ])));}
- void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;_maskStrokes.clear();_activeMaskPath=null;});}
+ void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_contrast=1;_saturation=1;_filmEffect=FilmEffect.none;_effectAmount=.35;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;_maskStrokes.clear();_activeMaskPath=null;});}
  @override Widget build(BuildContext context)=>Scaffold(
   appBar:AppBar(title:const Text('DOU EXPO',style:TextStyle(letterSpacing:2,fontWeight:FontWeight.bold)),
    actions:[IconButton(tooltip:'Export dimensions',onPressed:_export,icon:const Icon(Icons.ios_share)),
@@ -169,7 +171,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     });},
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint),
+     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint,contrast:_contrast,saturation:_saturation,filmEffect:_filmEffect,effectAmount:_effectAmount),
      child:_cameraOpen && _cameraReady && _camera!=null
       ? CameraPreview(_camera!)
       :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -264,6 +266,21 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     _slider('EDGE FEATHER',_maskFeather,(v)=>setState(()=>_maskFeather=v)),
     if(_maskMode!=OverlayMaskMode.fullFrame)
      const Padding(padding:EdgeInsets.only(bottom:4),child:Text('Portrait silhouette mask · brush to reveal or erase image two · undo supported',style:TextStyle(fontSize:9,color:Colors.white54))),
+    const Divider(height:12),
+    const Align(alignment:Alignment.centerLeft,child:Text('PHOTO FINISH',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold,color:Colors.white70))),
+    _slider('CONTRAST',_contrast/2,(v)=>setState(()=>_contrast=v*2),text:_contrast.toStringAsFixed(2)),
+    _slider('SATURATION',_saturation/2,(v)=>setState(()=>_saturation=v*2),text:_saturation.toStringAsFixed(2)),
+    Row(children:[
+     const SizedBox(width:105,child:Text('FILM EFFECT',style:TextStyle(fontSize:9,color:Colors.white60))),
+     Expanded(child:DropdownButton<FilmEffect>(isExpanded:true,value:_filmEffect,
+      items:const [
+       DropdownMenuItem(value:FilmEffect.none,child:Text('None')),
+       DropdownMenuItem(value:FilmEffect.grain,child:Text('Film grain')),
+       DropdownMenuItem(value:FilmEffect.scanlines,child:Text('Scanlines / shutter')),
+      ],onChanged:(v){if(v!=null)setState(()=>_filmEffect=v);})),
+    ]),
+    if(_filmEffect!=FilmEffect.none)
+     _slider('EFFECT AMOUNT',_effectAmount,(v)=>setState(()=>_effectAmount=v)),
     Row(children:[Expanded(child:Text('MODE: '+_modes[_blend].$1,style:const TextStyle(fontSize:9,color:Colors.white60))),
      TextButton(onPressed:_reset,child:const Text('RESET')),
      TextButton(onPressed:(){setState((){_overlay?.dispose();_overlay=null;});},child:const Text('REMOVE 2ND'))])

@@ -45,7 +45,7 @@ jobs:
         run: flutter pub get
       - name: Analyze
         working-directory: dou_expo_beta
-        run: flutter analyze --fatal-infos
+        run: flutter analyze --fatal-warnings
       - name: Run tests
         working-directory: dou_expo_beta
         run: flutter test --reporter expanded

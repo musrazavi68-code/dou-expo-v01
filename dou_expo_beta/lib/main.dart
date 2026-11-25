@@ -165,7 +165,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     });},
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes),
+     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes)),
      child:_cameraOpen && _cameraReady && _camera!=null
       ? CameraPreview(_camera!)
       :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[

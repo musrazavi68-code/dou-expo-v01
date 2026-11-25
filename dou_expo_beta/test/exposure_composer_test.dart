@@ -12,6 +12,27 @@ Future<ui.Image> _solidImage(int width, int height, ui.Color color) async {
   final image = await picture.toImage(width, height);
   picture.dispose();
   return image;
+  test('stencil presets return bounded paths', () {
+    for (final kind in StencilKind.values.where((kind) => kind != StencilKind.none)) {
+      final path = StencilLibrary.pathFor(kind, const ui.Size(100, 120));
+      expect(path.getBounds().left, greaterThanOrEqualTo(0));
+      expect(path.getBounds().top, greaterThanOrEqualTo(0));
+      expect(path.getBounds().right, lessThanOrEqualTo(100));
+      expect(path.getBounds().bottom, lessThanOrEqualTo(120));
+    }
+  });
+
+  test('green forest tones suggest a warm orange stencil color', () async {
+    final forest = await _solidImage(16, 16, const ui.Color(0xFF477A35));
+    try {
+      final suggested = await StencilLibrary.complementaryColor(forest, stencil: StencilKind.tree);
+      final hue = HSLColor.fromColor(suggested).hue;
+      expect(hue, inInclusiveRange(20, 45));
+    } finally {
+      forest.dispose();
+    }
+  });
+
 }
 
 Future<ui.Color> _pixel(Uint8List bytes, int width, int x, int y) async {

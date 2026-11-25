@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 /// Cubic-free piecewise-linear RGB tone curves. Points are normalized 0..1.
 /// The endpoints are always anchored, preventing accidental clipping ranges.
 class ToneCurve {

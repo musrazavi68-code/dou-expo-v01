@@ -171,7 +171,7 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
    if(token!=_restoreToken||!mounted)return;
    final raw=project.canvas['darkroom'];
    if(raw is Map){final settings=Map<String,Object?>.from(raw);_brightness=(settings['brightness'] as num?)?.toDouble()??_brightness;_contrast=(settings['contrast'] as num?)?.toDouble()??_contrast;_saturation=(settings['saturation'] as num?)?.toDouble()??_saturation;}
-   if(path==null||bytes!=null){setState(()=>{_photoBytes=bytes;_loadedDarkroomPath=path;});}
+   if(path==null||bytes!=null){setState(() {_photoBytes=bytes;_loadedDarkroomPath=path;});}
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Darkroom restore failed: $e')));}
  }
  Future<void> _pick() async {
@@ -187,7 +187,7 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:'Darkroom source',assetPath:assetPath,settings:{'mode':'darkroom'})],
     activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'darkroom'}));
-   if(mounted)setState(()=>{_photo=x,_photoBytes=bytes});
+   if(mounted)setState(() {_photo=x;_photoBytes=bytes;});
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Project import failed: $e')));}
  }
  Future<void> _export() async {

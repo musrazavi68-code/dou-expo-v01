@@ -96,6 +96,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1,_gestureStartScale=1;
  Offset _offset=Offset.zero,_gestureStartOffset=Offset.zero,_gestureStartFocalPoint=Offset.zero;
  final List<MaskStroke> _maskStrokes=[];
+ String? _loadedBasePath,_loadedOverlayPath;
+ int _restoreToken=0;
  Path? _activeMaskPath;
  bool _maskEdit=false,_eraseBrush=false;
  double _brushSize=.035,_maskFeather=0;
@@ -112,8 +114,52 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   ('DIFFERENCE',BlendMode.difference),('NORMAL',BlendMode.srcOver)];
  static const _ratios=< (String,double) >[
   ('Original',0),('1:1',1),('3:2',1.5),('4:5',.8),('16:9',16/9)];
- @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_startCamera();}
- @override void dispose(){WidgetsBinding.instance.removeObserver(this);_camera?.dispose();_base?.dispose();_overlay?.dispose();super.dispose();}
+ @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);widget.session.addListener(_onProjectChanged);unawaited(_restoreFromProject());_startCamera();}
+ @override void dispose(){widget.session.removeListener(_onProjectChanged);_restoreToken++;WidgetsBinding.instance.removeObserver(this);_camera?.dispose();_base?.dispose();_overlay?.dispose();super.dispose();}
+ void _onProjectChanged(){unawaited(_restoreFromProject());}
+ Future<void> _restoreFromProject() async {
+  final token=++_restoreToken;final project=widget.session.document;
+  final bases=project.layers.where((v)=>v.name=='Base photograph').toList();
+  final overlays=project.layers.where((v)=>v.name=='Second exposure').toList();
+  final basePath=bases.isEmpty?null:bases.last.assetPath;
+  final overlayPath=overlays.isEmpty?null:overlays.last.assetPath;
+  try{
+   ui.Image? nextBase,nextOverlay;
+   if(basePath!=_loadedBasePath&&basePath!=null){final file=await ProjectStore().resolveAsset(project.id,basePath);nextBase=await ExposureComposer.decode(await file.readAsBytes());}
+   if(token!=_restoreToken||!mounted){nextBase?.dispose();return;}
+   if(overlayPath!=_loadedOverlayPath&&overlayPath!=null){final file=await ProjectStore().resolveAsset(project.id,overlayPath);nextOverlay=await ExposureComposer.decode(await file.readAsBytes());}
+   if(token!=_restoreToken||!mounted){nextBase?.dispose();nextOverlay?.dispose();return;}
+   final raw=project.canvas['doubleExposure'];
+   if(raw is Map){
+    final settings=Map<String,Object?>.from(raw);
+    double readValue(String key,double fallback)=>(settings[key] as num?)?.toDouble()??fallback;
+    final blendIndex=_modes.indexWhere((v)=>v.$1==settings['blend']);
+    final maskIndex=OverlayMaskMode.values.indexWhere((v)=>v.name==settings['maskMode']);
+    final stencilIndex=StencilKind.values.indexWhere((v)=>v.name==settings['stencil']);
+    final fillIndex=StencilFillMode.values.indexWhere((v)=>v.name==settings['stencilFill']);
+    final effectIndex=FilmEffect.values.indexWhere((v)=>v.name==settings['filmEffect']);
+    final strokes=<MaskStroke>[];
+    final rawStrokes=settings['maskStrokes'];
+    if(rawStrokes is List){for(final item in rawStrokes){if(item is! Map)continue;final points=item['points'];if(points is! List||points.isEmpty)continue;final path=Path();for(var i=0;i<points.length;i++){final point=points[i];if(point is! Map)continue;final x=(point['x'] as num?)?.toDouble()??0;final y=(point['y'] as num?)?.toDouble()??0;if(i==0){path.moveTo(x,y);}else{path.lineTo(x,y);}}strokes.add(MaskStroke(path:path,width:(item['width'] as num?)?.toDouble()??.03,erase:item['erase']==true));}}
+    setState((){
+     if(nextBase!=null){_base?.dispose();_base=nextBase;_loadedBasePath=basePath;}
+     if(nextOverlay!=null){_overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;}
+     if(basePath==null){_base?.dispose();_base=null;_loadedBasePath=null;}
+     if(overlayPath==null){_overlay?.dispose();_overlay=null;_loadedOverlayPath=null;}
+     _mix=readValue('mix',_mix);_baseEv=readValue('baseExposure',_baseEv);_overlayEv=readValue('overlayExposure',_overlayEv);
+     _offset=Offset(readValue('offsetX',_offset.dx),readValue('offsetY',_offset.dy));_scale=readValue('scale',_scale);
+     _maskFeather=readValue('maskFeather',_maskFeather);_brushSize=readValue('brushSize',_brushSize);
+     _contrast=readValue('contrast',_contrast);_saturation=readValue('saturation',_saturation);_effectAmount=readValue('effectAmount',_effectAmount);
+     if(blendIndex>=0)_blend=blendIndex;if(maskIndex>=0)_maskMode=OverlayMaskMode.values[maskIndex];if(stencilIndex>=0)_stencil=StencilKind.values[stencilIndex];if(fillIndex>=0)_stencilFill=StencilFillMode.values[fillIndex];if(effectIndex>=0)_filmEffect=FilmEffect.values[effectIndex];
+     if(settings['stencilTint'] is int)_stencilTint=Color(settings['stencilTint'] as int);
+     _maskStrokes..clear()..addAll(strokes);
+    });
+   }else{
+    if(nextBase!=null)setState((){_base?.dispose();_base=nextBase;_loadedBasePath=basePath;});
+    if(nextOverlay!=null)setState((){_overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;});
+   }
+  }catch(error){if(mounted)_toast('Project restore failed: $error');}
+ }
  @override void didChangeAppLifecycleState(AppLifecycleState s){
   if(s==AppLifecycleState.paused||s==AppLifecycleState.inactive){final c=_camera;_camera=null;_cameraReady=false;c?.dispose();if(mounted)setState((){});}
   if(s==AppLifecycleState.resumed&&_cameraOpen&&_camera==null)_startCamera();
@@ -174,6 +220,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    final stamp=DateTime.now().microsecondsSinceEpoch;
    final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
    final layerId=second?'overlay_$stamp':'base_$stamp';
+   if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    final current=widget.session.document;
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],

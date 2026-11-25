@@ -40,6 +40,54 @@ class _DouExpoShellState extends State<DouExpoShell> with WidgetsBindingObserver
  late final AutosaveCoordinator _autosave;
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);final now=DateTime.now().toUtc();_session=ProjectSession(initial:ProjectDocument(id:'dou-expo-main',name:'Dou Expo Project',createdAt:now,updatedAt:now,canvas:const {},layers:const []));_autosave=AutosaveCoordinator(session:_session,onError:(e,st)=>debugPrint('Autosave failed: $e'));_session.restoreCurrent().then((restored){if(restored)debugPrint('Dou Expo project restored');}).catchError((Object e,StackTrace st){debugPrint('Project restore failed: $e');});}
  @override void didChangeAppLifecycleState(AppLifecycleState s){if(s==AppLifecycleState.paused||s==AppLifecycleState.inactive){_autosave.flush().catchError((Object e,StackTrace st){debugPrint('Autosave flush failed: $e');});}}
+ Future<void> _clearTemporaryCache() async {
+  await _autosave.flush();
+  final directory=await getTemporaryDirectory();
+  var removed=0;
+  if(await directory.exists()){
+   await for(final entity in directory.list(followLinks:false)){
+    final name=entity.uri.pathSegments.where((v)=>v.isNotEmpty).last;
+    if(!name.startsWith('dou_expo_'))continue;
+    await entity.delete(recursive:true);removed++;
+   }
+  }
+  if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+   SnackBar(content:Text(removed==0?'Temporary Dou Expo cache is already clear':'Cleared $removed temporary cache item(s)')));
+ }
+ Future<void> _confirmClearHistory() async {
+  final confirmed=await showDialog<bool>(context:context,builder:(dialogContext)=>AlertDialog(
+   title:const Text('Clear editing history?'),
+   content:const Text('Undo and redo snapshots for this open session will be cleared. Your current project, photos and saved edits will remain unchanged. History starts fresh and is cleared automatically when the app closes.'),
+   actions:[
+    TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('CANCEL')),
+    FilledButton(onPressed:()=>Navigator.pop(dialogContext,true),child:const Text('CLEAR HISTORY')),
+   ],
+  ));
+  if(confirmed==true&&mounted){_session.clearHistory();ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Editing history cleared')));}
+ }
+ Future<void> _showSettings() async {
+  await showModalBottomSheet<void>(context:context,isScrollControlled:true,
+   backgroundColor:const Color(0xFF17171B),builder:(sheetContext)=>SafeArea(
+    child:Padding(padding:const EdgeInsets.fromLTRB(16,12,16,24),child:Column(
+     mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Center(child:SizedBox(width:38,child:Divider(color:Colors.white38,thickness:3))),
+      const SizedBox(height:12),
+      const Text('SETTINGS',style:TextStyle(fontSize:15,fontWeight:FontWeight.w700,letterSpacing:1.5)),
+      const SizedBox(height:8),
+      ListTile(leading:const Icon(Icons.cleaning_services_outlined),title:const Text('Clear temporary cache'),
+       subtitle:const Text('Remove temporary Dou Expo export files only. Projects and source photos are kept.'),
+       onTap:() async {Navigator.pop(sheetContext);try{await _clearTemporaryCache();}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Cache clear failed: $e')));}}),
+      const Divider(height:1),
+      ListTile(leading:const Icon(Icons.history_toggle_off),title:const Text('Clear editing history'),
+       subtitle:AnimatedBuilder(animation:_session,builder:(context,_)=>Text('${_session.undoCount} undo step(s) available · current session only')),
+       onTap:(){Navigator.pop(sheetContext);_confirmClearHistory();}),
+      const Divider(height:1),
+      const ListTile(leading:Icon(Icons.info_outline),title:Text('History lifetime'),
+       subtitle:Text('Undo/redo history is kept in memory while the app is open. It is not stored in project files and resets after the app is closed.')),
+     ],
+    )),
+   ));
+ }
  @override void dispose(){WidgetsBinding.instance.removeObserver(this);_autosave.dispose();_session.dispose();super.dispose();}
  @override Widget build(BuildContext context) {
   final pages=<Widget>[
@@ -60,6 +108,7 @@ class _DouExpoShellState extends State<DouExpoShell> with WidgetsBindingObserver
        style:const TextStyle(fontSize:9,color:Colors.white54,letterSpacing:1))),
       IconButton(tooltip:'Save project now',onPressed:()=>_autosave.flush().catchError((Object e,StackTrace st){debugPrint('Manual save failed: $e');}),
        icon:const Icon(Icons.save_outlined,size:19)),
+      IconButton(tooltip:'Settings',onPressed:_showSettings,icon:const Icon(Icons.settings_outlined,size:19)),
      ]),
     )),
     NavigationBar(

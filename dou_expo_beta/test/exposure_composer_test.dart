@@ -12,28 +12,7 @@ Future<ui.Image> _solidImage(int width, int height, ui.Color color) async {
   final image = await picture.toImage(width, height);
   picture.dispose();
   return image;
-  test('stencil presets return bounded paths', () {
-    for (final kind in StencilKind.values.where((kind) => kind != StencilKind.none)) {
-      final path = StencilLibrary.pathFor(kind, const ui.Size(100, 120));
-      expect(path.getBounds().left, greaterThanOrEqualTo(0));
-      expect(path.getBounds().top, greaterThanOrEqualTo(0));
-      expect(path.getBounds().right, lessThanOrEqualTo(100));
-      expect(path.getBounds().bottom, lessThanOrEqualTo(120));
-    }
-  });
 
-  test('green forest tones suggest a warm orange stencil color', () async {
-    final forest = await _solidImage(16, 16, const ui.Color(0xFF477A35));
-    try {
-      final suggested = await StencilLibrary.complementaryColor(forest, stencil: StencilKind.tree);
-      expect(suggested.red, greaterThan(suggested.green));
-      expect(suggested.green, greaterThan(suggested.blue));
-    } finally {
-      forest.dispose();
-    }
-  });
-
-}
 
 Future<ui.Color> _pixel(Uint8List bytes, int width, int x, int y) async {
   final codec = await ui.instantiateImageCodec(bytes);
@@ -52,6 +31,28 @@ Future<ui.Color> _pixel(Uint8List bytes, int width, int x, int y) async {
 }
 
 void main() {
+  test('all heritage stencil paths stay inside normalized canvas', () {
+    for (final kind in StencilKind.values.where((kind) => kind != StencilKind.none)) {
+      final path = StencilLibrary.pathFor(kind, const ui.Size(100, 120));
+      expect(path.getBounds().left, greaterThanOrEqualTo(0), reason: kind.name);
+      expect(path.getBounds().top, greaterThanOrEqualTo(0), reason: kind.name);
+      expect(path.getBounds().right, lessThanOrEqualTo(100), reason: kind.name);
+      expect(path.getBounds().bottom, lessThanOrEqualTo(120), reason: kind.name);
+    }
+  });
+
+  test('green forest tones suggest a warm orange stencil color', () async {
+    final forest = await _solidImage(16, 16, const ui.Color(0xFF477A35));
+    try {
+      final suggested = await StencilLibrary.complementaryColor(forest, stencil: StencilKind.tree);
+      expect(suggested.red, greaterThan(suggested.green));
+      expect(suggested.green, greaterThan(suggested.blue));
+    } finally {
+      forest.dispose();
+    }
+  });
+
+
   test('portrait mask path stays within normalized canvas', () {
     final path = ExposureComposer.portraitMaskPath(const ui.Size(100, 200));
     expect(path.getBounds().left, greaterThanOrEqualTo(0));

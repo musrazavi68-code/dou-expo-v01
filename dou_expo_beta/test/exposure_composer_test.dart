@@ -12,7 +12,7 @@ Future<ui.Image> _solidImage(int width, int height, ui.Color color) async {
   final image = await picture.toImage(width, height);
   picture.dispose();
   return image;
-
+}
 
 Future<ui.Color> _pixel(Uint8List bytes, int width, int x, int y) async {
   final codec = await ui.instantiateImageCodec(bytes);

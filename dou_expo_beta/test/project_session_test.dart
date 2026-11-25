@@ -37,6 +37,24 @@ void main() {
     expect(session.document.name, 'Edited');
   });
 
+  test('clearHistory removes only in-memory undo and redo snapshots', () {
+    final session = ProjectSession.withBackend(
+      initial: doc('Initial'),
+      persist: (_) async {},
+      restore: (_) async => null,
+      writeAsset: (_, _, _) async => 'assets/test.png',
+    );
+
+    session.replace(doc('Edited'));
+    expect(session.canUndo, isTrue);
+    session.clearHistory();
+
+    expect(session.canUndo, isFalse);
+    expect(session.canRedo, isFalse);
+    expect(session.document.name, 'Edited');
+    expect(session.isDirty, isTrue);
+  });
+
   test('save persists a newer edit that occurs while IO is in progress', () async {
     final gate = Completer<void>();
     final saved = <String>[];

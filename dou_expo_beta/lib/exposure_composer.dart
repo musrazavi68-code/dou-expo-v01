@@ -100,7 +100,7 @@ class StencilLibrary {
         p.cubicTo(w*.08,h*.85,w*.05,h*.25,w*.5,h*.2); p.close(); return p;
       case StencilKind.laurel:
       case StencilKind.wreath:
-        p.addOval(Rect.fromLTWH(w*.16,h*.12,w*.68,h*.78), pathFillType: PathFillType.evenOdd);
+        p.addOval(Rect.fromLTWH(w*.16,h*.12,w*.68,h*.78));
         for(var wreathIndex=0;wreathIndex<9;wreathIndex++){final y=h*(.2+wreathIndex*.075); p.addOval(Rect.fromLTWH(w*(wreathIndex%2==0?.16:.68),y,w*.16,h*.065));}
         return p;
       case StencilKind.persianGuard:

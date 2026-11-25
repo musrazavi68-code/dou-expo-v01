@@ -204,7 +204,7 @@ class _StudioScreenState extends State<StudioScreen> {
                 FilledButton.icon(onPressed:()=>chooseImage(ImageSource.gallery),icon:const Icon(Icons.add_photo_alternate),label:const Text('Choose photo')),
               ]))),
               if(pattern!=null) Opacity(opacity:opacity,child:ColorFiltered(
-                colorFilter:ColorFilter.mode(Colors.white.withOpacity(luminant?.65:1),blend.$2),
+                colorFilter:ColorFilter.mode(Colors.white.withOpacity(luminant ? .65 : 1),blend.$2),
                 child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:grad.$1,end:grad.$2,colors:pattern!.colors))),
               )),
               if(showGrid) IgnorePointer(child:CustomPaint(painter:GridPainter())),

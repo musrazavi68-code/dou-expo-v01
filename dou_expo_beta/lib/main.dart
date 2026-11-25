@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'exposure_composer.dart';
@@ -128,17 +129,31 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
        items:const [72,150,300,600].map((v)=>DropdownMenuItem(value:v,child:Text('$v DPI'))).toList(),
        onChanged:(v){if(v!=null)ss(()=>dpi=v);})]),
      ],
-     const SizedBox(height:8),const Text('File format: PNG · lossless'),
+     const SizedBox(height:8),const Text('File format'),
+     Wrap(spacing:6,children:[
+      ChoiceChip(label:const Text('PNG · lossless'),selected:format=='PNG',onSelected:(_)=>ss(()=>format='PNG')),
+      ChoiceChip(label:const Text('JPEG · quality 95'),selected:format=='JPEG',onSelected:(_)=>ss(()=>format='JPEG')),
+     ]),
      FilledButton.icon(onPressed:(){final outputSize=unit=='cm'?(cm/2.54*dpi).round():sizes[si].$2;
-      Navigator.pop(ctx);_save(_ratios[ri].$2,outputSize);},
-      icon:const Icon(Icons.file_download),label:const Text('EXPORT PNG'))
+      final selectedFormat=format;Navigator.pop(ctx);_save(_ratios[ri].$2,outputSize,selectedFormat);},
+      icon:const Icon(Icons.file_download),label:Text('EXPORT $format'))
     ])))));
  }
- Future<void> _save(double ratio,int size) async {
+ Future<void> _save(double ratio,int size,String format) async {
   if(_busy)return;setState(()=>_busy=true);
-  try{final bytes=await _render(ratio,size);await Gal.putImageBytes(bytes,
-   name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString(),album:'Dou Expo');_toast('PNG saved to Gallery');}
-  catch(e){_toast('Export failed: '+e.toString());}finally{if(mounted)setState(()=>_busy=false);}
+  try{
+   final pngBytes=await _render(ratio,size);
+   Uint8List outputBytes=pngBytes;
+   final extension=format=='JPEG'?'jpg':'png';
+   if(format=='JPEG'){
+    final decoded=img.decodeImage(pngBytes);
+    if(decoded==null)throw StateError('Could not decode rendered image for JPEG export');
+    outputBytes=Uint8List.fromList(img.encodeJpg(decoded,quality:95));
+   }
+   await Gal.putImageBytes(outputBytes,
+    name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+extension,album:'Dou Expo');
+   _toast(format+' saved to Gallery'+(format=='JPEG'?' · quality 95':' · lossless'));
+  }catch(e){_toast('Export failed: '+e.toString());}finally{if(mounted)setState(()=>_busy=false);}
  }
  Future<void> _share() async {
   if(_base==null||_busy)return;setState(()=>_busy=true);

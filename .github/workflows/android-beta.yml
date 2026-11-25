@@ -1,4 +1,4 @@
-name: Dou Expo Android Beta 1.0.1 - Autosave, session history and typed state
+name: Dou Expo Android Beta 1.0.1 - Autosave, session history and explicit autosave consent
 on:
   workflow_dispatch:
   push:

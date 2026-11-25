@@ -216,9 +216,9 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
     final k = _filterIntensity;
     final warm = _selectedFilterName == 'MUME' || _selectedFilterName == 'BORAGO';
     return ColorFilter.matrix(<double>[
-      1+(warm?.20:-.08)*k,0,0,0,(warm?12:8)*k,
-      0,1+(warm?.08:.05)*k,0,0,(warm?6:10)*k,
-      0,0,1+(warm?-.12:.18)*k,0,(warm?-4:14)*k,
+      1+(warm ? .20 : -.08)*k,0,0,0,(warm ? 12 : 8)*k,
+      0,1+(warm ? .08 : .05)*k,0,0,(warm ? 6 : 10)*k,
+      0,0,1+(warm ? -.12 : .18)*k,0,(warm ? -4 : 14)*k,
       0,0,0,1,0,
     ]);
   }
@@ -347,7 +347,7 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
             child:Stack(fit:StackFit.expand,children:[
               _buildBaseLayer(),
               if(_activePattern!=null)AnimatedOpacity(duration:const Duration(milliseconds:160),opacity:_transparency.clamp(.05,1),
-                child:ColorFiltered(colorFilter:ColorFilter.mode(Colors.white.withValues(alpha:_luminantMode?.65:1),blend.$2),
+                child:ColorFiltered(colorFilter:ColorFilter.mode(Colors.white.withValues(alpha:_luminantMode ? .65 : 1),blend.$2),
                   child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:grad.$1,end:grad.$2,colors:_activePattern!.colors))))),
               if(_showGrid)IgnorePointer(child:CustomPaint(painter:_GridPainter())),
               Positioned(top:10,left:10,child:_pill('DOU EXPO · BETA')),

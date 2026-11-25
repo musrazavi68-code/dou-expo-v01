@@ -7,6 +7,63 @@ import 'package:material_ui/material_ui.dart';
 /// Controls where the second exposure is allowed to appear.
 enum OverlayMaskMode { fullFrame, insidePortrait, outsidePortrait }
 
+enum StencilKind { none, tree, lotus, cypress, arch, wingedBull }
+
+class StencilLibrary {
+  static Path pathFor(StencilKind kind, Size size) {
+    final w = size.width, h = size.height;
+    final p = Path();
+    switch (kind) {
+      case StencilKind.none:
+        return p..addRect(Offset.zero & size);
+      case StencilKind.tree:
+        p.moveTo(w*.5,h*.03); p.lineTo(w*.12,h*.42); p.lineTo(w*.34,h*.42);
+        p.lineTo(w*.08,h*.68); p.lineTo(w*.38,h*.68); p.lineTo(w*.38,h*.96);
+        p.lineTo(w*.62,h*.96); p.lineTo(w*.62,h*.68); p.lineTo(w*.92,h*.68);
+        p.lineTo(w*.66,h*.42); p.lineTo(w*.88,h*.42); p.close(); return p;
+      case StencilKind.cypress:
+        p.moveTo(w*.5,h*.02); p.cubicTo(w*.42,h*.25,w*.18,h*.4,w*.28,h*.58);
+        p.cubicTo(w*.12,h*.72,w*.3,h*.82,w*.42,h*.84);
+        p.lineTo(w*.42,h*.98); p.lineTo(w*.58,h*.98); p.lineTo(w*.58,h*.84);
+        p.cubicTo(w*.8,h*.8,w*.88,h*.68,w*.72,h*.56);
+        p.cubicTo(w*.84,h*.38,w*.58,h*.22,w*.5,h*.02); p.close(); return p;
+      case StencilKind.lotus:
+        p.moveTo(w*.5,h*.95);
+        p.cubicTo(w*.12,h*.78,w*.12,h*.5,w*.5,h*.18);
+        p.cubicTo(w*.88,h*.5,w*.88,h*.78,w*.5,h*.95);
+        p.moveTo(w*.5,h*.88);
+        p.cubicTo(w*.32,h*.62,w*.32,h*.38,w*.5,h*.08);
+        p.cubicTo(w*.68,h*.38,w*.68,h*.62,w*.5,h*.88);
+        p.close(); return p;
+      case StencilKind.arch:
+        p.addRRect(RRect.fromRectAndRadius(Rect.fromLTWH(w*.12,h*.08,w*.76,h*.88),Radius.circular(w*.34)));
+        p.addRect(Rect.fromLTWH(w*.27,h*.32,w*.46,h*.64));
+        return Path.combine(PathOperation.difference,p,Path()..addRect(Rect.fromLTWH(w*.27,h*.32,w*.46,h*.64)));
+      case StencilKind.wingedBull:
+        p.moveTo(w*.08,h*.55); p.lineTo(w*.24,h*.36); p.lineTo(w*.44,h*.4);
+        p.lineTo(w*.55,h*.16); p.lineTo(w*.7,h*.36); p.lineTo(w*.92,h*.48);
+        p.lineTo(w*.78,h*.62); p.lineTo(w*.9,h*.78); p.lineTo(w*.64,h*.72);
+        p.lineTo(w*.5,h*.92); p.lineTo(w*.36,h*.72); p.lineTo(w*.1,h*.8); p.close(); return p;
+    }
+  }
+
+  static Future<Color> complementaryColor(ui.Image image) async {
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (data == null) return const Color(0xFFFF8A00);
+    var r = 0.0, g = 0.0, b = 0.0, count = 0;
+    final step = math.max(1, (image.width * image.height ~/ 12000));
+    for (var i = 0; i < image.width * image.height; i += step) {
+      final o = i * 4;
+      if (data.getUint8(o + 3) < 24) continue;
+      r += data.getUint8(o); g += data.getUint8(o + 1); b += data.getUint8(o + 2); count++;
+    }
+    if (count == 0) return const Color(0xFFFF8A00);
+    final average = Color.fromARGB(255, (r/count).round(), (g/count).round(), (b/count).round());
+    final hsl = HSLColor.fromColor(average);
+    return hsl.withHue((hsl.hue + 180) % 360).withSaturation(math.max(.45,hsl.saturation)).withLightness(.58).toColor();
+  }
+}
+
 class MaskStroke {
   const MaskStroke({required this.path, required this.width, this.erase = false});
   final Path path;
@@ -78,6 +135,7 @@ class ExposureComposer {
     required OverlayMaskMode maskMode,
     double maskFeather = 0,
     List<MaskStroke> maskStrokes = const [],
+    StencilKind stencil = StencilKind.none,
   }) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -100,6 +158,10 @@ class ExposureComposer {
         width: destination.width * overlayScale,
         height: destination.height * overlayScale,
       );
+      if (stencil != StencilKind.none) {
+        canvas.save();
+        canvas.clipPath(StencilLibrary.pathFor(stencil, size), doAntiAlias: true);
+      }
       if (maskMode == OverlayMaskMode.fullFrame && maskStrokes.isEmpty) {
         canvas.drawImageRect(
           overlay,
@@ -173,6 +235,7 @@ class ExposureComposer {
         canvas.restore(Paint()..blendMode = BlendMode.dstIn);
         canvas.restore();
       }
+      if (stencil != StencilKind.none) canvas.restore();
     }
     canvas.restore();
   }
@@ -191,6 +254,7 @@ class ExposureComposer {
     required OverlayMaskMode maskMode,
     double maskFeather = 0,
     List<MaskStroke> maskStrokes = const [],
+    StencilKind stencil = StencilKind.none,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -208,6 +272,7 @@ class ExposureComposer {
       maskMode: maskMode,
       maskFeather: maskFeather,
       maskStrokes: maskStrokes,
+      stencil: stencil,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
@@ -235,6 +300,7 @@ class ExposurePreviewPainter extends CustomPainter {
     required this.maskMode,
     this.maskFeather = 0,
     this.maskStrokes = const [],
+    this.stencil = StencilKind.none,
   });
 
   final ui.Image? base;
@@ -248,6 +314,7 @@ class ExposurePreviewPainter extends CustomPainter {
   final OverlayMaskMode maskMode;
   final double maskFeather;
   final List<MaskStroke> maskStrokes;
+  final StencilKind stencil;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -268,6 +335,7 @@ class ExposurePreviewPainter extends CustomPainter {
       maskMode: maskMode,
       maskFeather: maskFeather,
       maskStrokes: maskStrokes,
+      stencil: stencil,
     );
   }
 
@@ -283,5 +351,6 @@ class ExposurePreviewPainter extends CustomPainter {
       old.overlayScale != overlayScale ||
       old.maskMode != maskMode ||
       old.maskFeather != maskFeather ||
-      old.maskStrokes != maskStrokes;
+      old.maskStrokes != maskStrokes ||
+      old.stencil != stencil;
 }

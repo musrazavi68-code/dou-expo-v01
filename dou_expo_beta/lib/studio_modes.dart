@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:gal/gal.dart';
@@ -10,6 +11,30 @@ import 'package:image/image.dart' as img;
 
 const _ink=Color(0xFF100C0B);
 const _yellow=Color(0xFFFACC15);
+
+Uint8List _developOrdinaryPhoto(Map<String,Object> args){
+ final bytes=args['bytes'] as Uint8List;
+ final recipe=args['recipe'] as String;
+ final decoded=img.decodeImage(bytes);
+ if(decoded==null)throw StateError('Captured image could not be decoded');
+ final random=math.Random(31);
+ for(var y=0;y<decoded.height;y++){
+  for(var x=0;x<decoded.width;x++){
+   final pixel=decoded.getPixel(x,y);
+   var r=pixel.r.toDouble(),g=pixel.g.toDouble(),b=pixel.b.toDouble();
+   if(recipe=='MONO'){
+    final luminance=.2126*r+.7152*g+.0722*b;r=luminance;g=luminance;b=luminance;
+   }else if(recipe=='WARM'){
+    r=(r*1.08+7).clamp(0,255);g=(g*1.015).clamp(0,255);b=(b*.88).clamp(0,255);
+   }else if(recipe=='COOL'){
+    r=(r*.90).clamp(0,255);g=(g*1.01).clamp(0,255);b=(b*1.09+5).clamp(0,255);
+   }
+   final grain=recipe=='COLOR'?0:random.nextInt(7)-3;
+   decoded.setPixelRgba(x,y,(r+grain).round().clamp(0,255),(g+grain).round().clamp(0,255),(b+grain).round().clamp(0,255),pixel.a.toInt());
+  }
+ }
+ return Uint8List.fromList(img.encodeJpg(decoded,quality:95));
+}
 
 class OrdinaryCameraScreen extends StatefulWidget {
  const OrdinaryCameraScreen({super.key});
@@ -20,7 +45,8 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  List<CameraDescription> _available=[];
  bool _ready=false,_manual=false,_busy=false;
  int _timerSeconds=0,_countdown=0;
- double _ev=0,_zoom=1,_maxZoom=4;
+ double _ev=0,_minEv=-2,_maxEv=2,_zoom=1,_maxZoom=4;
+ bool _cameraInitializing=false;
  String _film='COLOR';
  XFile? _lastShot;
  Uint8List? _lastShotBytes;
@@ -31,38 +57,24 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
   if(state==AppLifecycleState.resumed)_init();
  }
  Future<void> _init() async {
+  if(_cameraInitializing||_camera!=null)return;
+  _cameraInitializing=true;
   try{
    _available=await availableCameras();if(_available.isEmpty)return;
-   final c=CameraController(_available.first,ResolutionPreset.high,enableAudio:false);
+   final back=_available.where((x)=>x.lensDirection==CameraLensDirection.back).toList();
+   final selected=back.isNotEmpty?back.first:_available.first;
+   final c=CameraController(selected,ResolutionPreset.high,enableAudio:false);
    await c.initialize();final z=await c.getMaxZoomLevel();
+   final minEv=await c.getMinExposureOffset();final maxEv=await c.getMaxExposureOffset();
    if(!mounted){await c.dispose();return;}
-   setState(() {_camera=c;_ready=true;_maxZoom=z;});
+   setState(() {_camera=c;_ready=true;_maxZoom=z;_minEv=minEv;_maxEv=maxEv;_ev=0;_zoom=1;});
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Camera unavailable: $e')));}
+  finally{_cameraInitializing=false;}
  }
  Future<void> _setEv(double v) async {final c=_camera;if(c==null)return;try{final a=await c.setExposureOffset(v);if(mounted)setState(()=>_ev=a);}catch(_){}}
  Future<void> _setZoom(double v) async {final c=_camera;if(c==null)return;try{await c.setZoomLevel(v);if(mounted)setState(()=>_zoom=v);}catch(_){}}
  Future<void> _focus(Offset p, Size size) async {final c=_camera;if(c==null)return;try{await c.setFocusPoint(Offset(p.dx/size.width,p.dy/size.height));await c.setExposurePoint(Offset(p.dx/size.width,p.dy/size.height));}catch(_){}}
- Future<Uint8List> _applyFilm(Uint8List bytes,String recipe) async {
-  final decoded=img.decodeImage(bytes);
-  if(decoded==null) throw StateError('Captured image could not be decoded');
-  final random=math.Random(DateTime.now().millisecondsSinceEpoch);
-  for(var y=0;y<decoded.height;y++){
-   for(var x=0;x<decoded.width;x++){
-    final pixel=decoded.getPixel(x,y);
-    var r=pixel.r.toDouble(),g=pixel.g.toDouble(),b=pixel.b.toDouble();
-    if(recipe=='MONO'){
-     final luminance=.2126*r+.7152*g+.0722*b;r=luminance;g=luminance;b=luminance;
-    }else if(recipe=='WARM'){
-     r=(r*1.08+7).clamp(0,255);g=(g*1.015).clamp(0,255);b=(b*.88).clamp(0,255);
-    }else if(recipe=='COOL'){
-     r=(r*.90).clamp(0,255);g=(g*1.01).clamp(0,255);b=(b*1.09+5).clamp(0,255);
-    }
-    final grain=recipe=='COLOR'?0:random.nextInt(7)-3;
-    decoded.setPixelRgba(x,y,(r+grain).round().clamp(0,255),(g+grain).round().clamp(0,255),(b+grain).round().clamp(0,255),pixel.a.toInt());
-   }
-  }
-  return Uint8List.fromList(img.encodeJpg(decoded,quality:95));
- }
+ Future<Uint8List> _applyFilm(Uint8List bytes,String recipe)=>compute(_developOrdinaryPhoto,{'bytes':bytes,'recipe':recipe});
  Future<void> _capture() async {
   final c=_camera;if(c==null||!c.value.isInitialized||_busy)return;
   setState(()=>_busy=true);
@@ -94,7 +106,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  @override Widget build(BuildContext context)=>Scaffold(
   backgroundColor:_ink,
   appBar:AppBar(backgroundColor:_ink,title:const Text('ORDINARY CAMERA',style:TextStyle(fontSize:13,letterSpacing:2,fontWeight:FontWeight.w700)),
-   actions:[IconButton(tooltip:'Switch lens',onPressed:_flip,icon:const Icon(Icons.flip_camera_ios)),TextButton(onPressed:()=>setState(()=>_manual=!_manual),child:Text(_manual?'MANUAL':'AUTO',style:TextStyle(color:_manual?_yellow:Colors.white))) ]),
+   actions:[IconButton(tooltip:'Switch lens',onPressed:_flip,icon:const Icon(Icons.flip_camera_ios)),TextButton(onPressed:()=>setState(()=>_manual=!_manual),child:Text(_manual?'EV CONTROLS':'AUTO',style:TextStyle(color:_manual?_yellow:Colors.white))) ]),
   body:SafeArea(child:Column(children:[
    Expanded(flex:7,child:Padding(padding:const EdgeInsets.fromLTRB(12,6,12,8),child:ClipRRect(borderRadius:BorderRadius.circular(18),
     child:LayoutBuilder(builder:(ctx,box)=>GestureDetector(
@@ -109,9 +121,9 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
     )),
    ))),
    if(_manual)Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:Column(children:[
-    Row(children:[const SizedBox(width:42,child:Text('EV',style:TextStyle(color:_yellow))),Expanded(child:Slider(min:-2,max:2,divisions:16,value:_ev.clamp(-2,2),onChanged:_setEv)),Text(_ev.toStringAsFixed(1),style:const TextStyle(fontSize:11))]),
+    Row(children:[const SizedBox(width:42,child:Text('EV',style:TextStyle(color:_yellow))),Expanded(child:Slider(min:_minEv,max:_maxEv,value:_ev.clamp(_minEv,_maxEv),onChanged:_setEv)),Text(_ev.toStringAsFixed(1),style:const TextStyle(fontSize:11))]),
     Row(children:[const SizedBox(width:42,child:Text('ZOOM',style:TextStyle(color:_yellow))),Expanded(child:Slider(min:1,max:math.max(1.01,_maxZoom),value:_zoom.clamp(1,math.max(1.01,_maxZoom)),onChanged:_setZoom)),Text('${_zoom.toStringAsFixed(1)}x',style:const TextStyle(fontSize:11))]),
-    const Text('Focus point: tap the viewfinder · ISO and shutter speed depend on native camera support',style:TextStyle(fontSize:10,color:Colors.white54)),
+    const Text('Exposure compensation and tap-to-focus · ISO and shutter are not yet exposed by this camera driver',style:TextStyle(fontSize:10,color:Colors.white54)),
    ])),
    Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
     GestureDetector(onTap:()=>_lastShot==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.memory(_lastShotBytes!,fit:BoxFit.contain))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShotBytes==null?null:DecorationImage(image:MemoryImage(_lastShotBytes!),fit:BoxFit.cover)),child:_lastShot==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),

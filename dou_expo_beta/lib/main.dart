@@ -2,15 +2,22 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:gal/gal.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+  ));
   runApp(const DouExpoApp());
 }
 
@@ -18,7 +25,7 @@ class DouExpoApp extends StatelessWidget {
   const DouExpoApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Dou Expo Beta',
+    title: 'Dou expo Beta',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       brightness: Brightness.dark,
@@ -26,191 +33,326 @@ class DouExpoApp extends StatelessWidget {
       colorScheme: const ColorScheme.dark(primary: Color(0xFFFACC15), surface: Color(0xFF141418)),
       useMaterial3: true,
     ),
-    home: const StudioScreen(),
+    home: const DouExpoHomeScreen(),
   );
 }
 
 class PatternItem {
-  final String name, category;
+  const PatternItem({required this.id, required this.name, required this.category, required this.colors, this.defaultBlend = BlendMode.screen});
+  final String id, name, category;
   final List<Color> colors;
-  final BlendMode blend;
-  const PatternItem(this.name, this.category, this.colors, this.blend);
+  final BlendMode defaultBlend;
 }
 
-const patterns = <PatternItem>[
-  PatternItem('Light Leak','OPTICS',[Color(0xFFFF416C),Color(0xFFFFD166),Color(0xFF4ECDC4)],BlendMode.screen),
-  PatternItem('Light Spot','OPTICS',[Color(0xFFFFBE0B),Color(0xFFFB5607),Color(0xFFFF006E)],BlendMode.colorDodge),
-  PatternItem('Prism Flare','OPTICS',[Color(0xFF22D3EE),Color(0xFFA855F7),Color(0xFFF43F5E)],BlendMode.screen),
-  PatternItem('Anamorphic Streak','OPTICS',[Color(0xFF60A5FA),Color(0xFFFDE047),Color(0xFF38BDF8)],BlendMode.lighten),
-  PatternItem('Raindrops','NATURE',[Color(0xFF38BDF8),Color(0xFF818CF8),Color(0xFF0F172A)],BlendMode.softLight),
-  PatternItem('Branches','NATURE',[Color(0xFF334155),Color(0xFF94A3B8),Color(0xFF1E293B)],BlendMode.darken),
-  PatternItem('Mist & Fog','NATURE',[Color(0xFFE2E8F0),Color(0xFF64748B)],BlendMode.lighten),
-  PatternItem('Bokeh Orb','NATURE',[Color(0xFFFBBF24),Color(0xFFEC4899),Color(0xFF6366F1)],BlendMode.screen),
-  PatternItem('Vignette','EDITORIAL',[Colors.transparent,Color(0xCC000000)],BlendMode.multiply),
-  PatternItem('Duotone Sunset','EDITORIAL',[Color(0xFFF97316),Color(0xFF9333EA)],BlendMode.softLight),
+const kPatternBank = <PatternItem>[
+  PatternItem(id:'light_leak',name:'Light Leak',category:'Optics',colors:[Color(0xFFFF6B6B),Color(0xFFFFD166),Color(0xFF4ECDC4)]),
+  PatternItem(id:'light_spot',name:'Light Spot',category:'Optics',colors:[Color(0xFFFFBE0B),Color(0xFFFB5607),Color(0xFFFF006E)],defaultBlend:BlendMode.colorDodge),
+  PatternItem(id:'prism_flare',name:'Prism Flare',category:'Optics',colors:[Color(0xFF22D3EE),Color(0xFFA855F7),Color(0xFFF43F5E)]),
+  PatternItem(id:'anamorphic_streak',name:'Anamorphic Streak',category:'Optics',colors:[Color(0xFF60A5FA),Color(0xFFFDE047),Color(0xFF38BDF8)],defaultBlend:BlendMode.lighten),
+  PatternItem(id:'raindrops',name:'Raindrops',category:'Nature',colors:[Color(0xFF38BDF8),Color(0xFF818CF8),Color(0xFF0F172A)],defaultBlend:BlendMode.softLight),
+  PatternItem(id:'branches',name:'Branches',category:'Nature',colors:[Color(0xFF334155),Color(0xFF94A3B8),Color(0xFF1E293B)],defaultBlend:BlendMode.darken),
+  PatternItem(id:'mist_fog',name:'Mist & Fog',category:'Nature',colors:[Color(0xFFE2E8F0),Color(0xFF64748B)],defaultBlend:BlendMode.lighten),
+  PatternItem(id:'bokeh_orb',name:'Bokeh Orb',category:'Nature',colors:[Color(0xFFFBBF24),Color(0xFFEC4899),Color(0xFF6366F1)]),
+  PatternItem(id:'vignette',name:'Vignette',category:'Editorial',colors:[Colors.transparent,Color(0xCC000000)],defaultBlend:BlendMode.multiply),
+  PatternItem(id:'duotone_sunset',name:'Duotone Sunset',category:'Editorial',colors:[Color(0xFFF97316),Color(0xFF9333EA)],defaultBlend:BlendMode.softLight),
 ];
 
-class StudioScreen extends StatefulWidget {
-  const StudioScreen({super.key});
+class DouExpoHomeScreen extends StatefulWidget {
+  const DouExpoHomeScreen({super.key});
   @override
-  State<StudioScreen> createState() => _StudioScreenState();
+  State<DouExpoHomeScreen> createState() => _DouExpoHomeScreenState();
 }
 
-class _StudioScreenState extends State<StudioScreen> {
-  final picker = ImagePicker();
-  final random = Random();
-  final canvasKey = GlobalKey();
-  File? photo;
-  PatternItem? pattern = patterns.first;
-  double opacity = .65, filterStrength = .5;
-  int blendIndex = 0, ratioIndex = 0, gradientIndex = 0;
-  bool luminant = false, showGrid = false, watermark = false, postStage = false;
-  String filterName = 'NORMAL';
-  bool busy = false;
+class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindingObserver {
+  final _picker = ImagePicker();
+  final _random = Random();
+  final _renderBoundaryKey = GlobalKey();
+  CameraController? _cameraController;
+  List<CameraDescription> _cameras = [];
+  int _cameraIndex = 0;
+  bool _cameraReady = false, _useLiveCamera = true, _isExporting = false;
+  File? _photo;
+  PatternItem? _activePattern = kPatternBank.first;
+  double _transparency = .65, _filterIntensity = .5;
+  int _blendIndex = 1, _ratioIndex = 0, _gradientDirIndex = 0;
+  bool _luminantMode = false, _showGrid = true, _showWatermark = true, _fullResolution = true, _postStage = false;
+  String _selectedFilterName = 'NORMAL';
 
-  final blends = <(String,BlendMode)>[
-    ('NORMAL',BlendMode.srcOver),('SCREEN',BlendMode.screen),('MULTIPLY',BlendMode.multiply),
-    ('OVERLAY',BlendMode.overlay),('SOFT LIGHT',BlendMode.softLight),('HARD LIGHT',BlendMode.hardLight),
-    ('COLOR DODGE',BlendMode.colorDodge),('DIFFERENCE',BlendMode.difference),
-    ('DARKEN',BlendMode.darken),('LIGHTEN',BlendMode.lighten),('EXCLUSION',BlendMode.exclusion),
-    ('LUMINOSITY',BlendMode.saturation),
+  final _blendModes = const <(String,BlendMode)>[
+    ('ALPHA BLEND',BlendMode.srcOver),('SOFT LIGHT',BlendMode.softLight),('MULTIPLY',BlendMode.multiply),
+    ('LIGHTEN',BlendMode.lighten),('COLOR DODGE',BlendMode.colorDodge),('DIFFERENCE',BlendMode.difference),
+    ('SCREEN',BlendMode.screen),('OVERLAY',BlendMode.overlay),('DARKEN',BlendMode.darken),
   ];
-  final ratios = <(String,double)>[('1:1',1),('3:2',1.5),('4:3',4/3)];
-  final directions = <(Alignment,Alignment)>[
+  final _ratios = const <(String,double)>[('1:1',1),('3:2',1.5),('4:3',4/3)];
+  final _gradientDirs = const <(Alignment,Alignment)>[
     (Alignment.topCenter,Alignment.bottomCenter),(Alignment.bottomCenter,Alignment.topCenter),
     (Alignment.centerLeft,Alignment.centerRight),(Alignment.centerRight,Alignment.centerLeft),
     (Alignment.topLeft,Alignment.bottomRight),(Alignment.bottomRight,Alignment.topLeft),
     (Alignment.topRight,Alignment.bottomLeft),(Alignment.bottomLeft,Alignment.topRight),
   ];
-  final filters = const ['NORMAL','MUME','BORAGO','HYACINTH','FRAGRANS','DISPORUM','GENTIANA','LILY','DELONIX','MYOSOTIS','TULIPA'];
+  final _filterPresets = const ['NORMAL','MUME','BORAGO','HYACINTH','FRAGRANS','DISPORUM','GENTIANA','LILY','DELONIX','MYOSOTIS','TULIPA'];
 
-  Future<void> chooseImage(ImageSource source) async {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initCameras();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    final controller = _cameraController;
+    _cameraController = null;
+    controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      final old = _cameraController;
+      _cameraController = null;
+      _cameraReady = false;
+      old?.dispose();
+      if (mounted) setState(() {});
+    } else if (state == AppLifecycleState.resumed && _useLiveCamera) {
+      _setupCameraAt(_cameraIndex);
+    }
+  }
+
+  Future<void> _initCameras() async {
     try {
-      final x = await picker.pickImage(source: source, imageQuality: 100);
-      if (x != null) setState(() { photo = File(x.path); postStage = false; });
-    } catch (e) { message('Could not open image: $e'); }
+      _cameras = await availableCameras();
+      if (_cameras.isNotEmpty && _useLiveCamera) await _setupCameraAt(_cameraIndex);
+      else if (mounted) setState(() => _useLiveCamera = false);
+    } catch (e) {
+      if (mounted) { setState(() => _useLiveCamera = false); _message('Camera unavailable: $e'); }
+    }
   }
 
-  void message(String value) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+  Future<void> _setupCameraAt(int index) async {
+    if (_cameras.isEmpty || !mounted) return;
+    final old = _cameraController;
+    _cameraController = null;
+    if (mounted) setState(() => _cameraReady = false);
+    await old?.dispose();
+    final controller = CameraController(
+      _cameras[index % _cameras.length],
+      _fullResolution ? ResolutionPreset.high : ResolutionPreset.medium,
+      enableAudio: false,
+    );
+    try {
+      await controller.initialize();
+      if (!mounted || !_useLiveCamera) { await controller.dispose(); return; }
+      _cameraController = controller;
+      _cameraIndex = index % _cameras.length;
+      setState(() { _cameraReady = true; _useLiveCamera = true; });
+    } on CameraException catch (e) {
+      await controller.dispose();
+      if (mounted) { setState(() { _cameraReady = false; _useLiveCamera = false; }); _message('Camera error: ${e.description ?? e.code}'); }
+    }
   }
 
-  void cycleBlend(int delta) {
+  Future<void> _toggleLiveCamera() async {
+    if (_useLiveCamera) {
+      final old = _cameraController;
+      _cameraController = null;
+      setState(() { _useLiveCamera = false; _cameraReady = false; });
+      await old?.dispose();
+    } else {
+      setState(() => _useLiveCamera = true);
+      if (_cameras.isEmpty) await _initCameras(); else await _setupCameraAt(_cameraIndex);
+    }
+  }
+
+  Future<void> _switchCameraLens() async {
+    if (_cameras.length < 2) { _message('No second camera lens available'); return; }
     HapticFeedback.selectionClick();
-    setState(() => blendIndex = (blendIndex + delta + blends.length) % blends.length);
+    await _setupCameraAt((_cameraIndex + 1) % _cameras.length);
   }
 
-  ColorFilter get postFilter {
-    if (!postStage || filterName == 'NORMAL') return const ColorFilter.mode(Colors.transparent, BlendMode.dst);
-    final k = filterStrength;
-    final warm = filterName == 'MUME' || filterName == 'BORAGO';
+  Future<void> _capturePhoto() async {
+    final controller = _cameraController;
+    if (!_useLiveCamera || controller == null || !controller.value.isInitialized) {
+      _message('Live camera is not ready'); return;
+    }
+    try {
+      HapticFeedback.mediumImpact();
+      final shot = await controller.takePicture();
+      if (!mounted) return;
+      setState(() { _photo = File(shot.path); _postStage = false; _useLiveCamera = false; _cameraReady = false; });
+      _cameraController = null;
+      await controller.dispose();
+    } on CameraException catch (e) { _message('Capture failed: ${e.description ?? e.code}'); }
+  }
+
+  Future<void> _pickBaseImage() async {
+    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
+    if (file == null || !mounted) return;
+    final old = _cameraController;
+    _cameraController = null;
+    setState(() { _photo = File(file.path); _useLiveCamera = false; _cameraReady = false; _postStage = false; });
+    await old?.dispose();
+  }
+
+  void _message(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  void _randomizePattern() {
+    HapticFeedback.mediumImpact();
+    setState(() { _activePattern = kPatternBank[_random.nextInt(kPatternBank.length)]; _gradientDirIndex = _random.nextInt(8); });
+  }
+
+  void _cycleBlend(int delta) {
+    HapticFeedback.selectionClick();
+    setState(() => _blendIndex = (_blendIndex + delta + _blendModes.length) % _blendModes.length);
+  }
+
+  ColorFilter _activePostColorFilter() {
+    if (!_postStage || _selectedFilterName == 'NORMAL') return const ColorFilter.mode(Colors.transparent,BlendMode.dst);
+    final k = _filterIntensity;
+    final warm = _selectedFilterName == 'MUME' || _selectedFilterName == 'BORAGO';
     return ColorFilter.matrix(<double>[
-      1 + (warm ? .20 : -.08)*k,0,0,0,(warm ? 12 : 8)*k,
-      0,1 + (warm ? .08 : .05)*k,0,0,(warm ? 6 : 10)*k,
-      0,0,1 + (warm ? -.12 : .18)*k,0,(warm ? -4 : 14)*k,
+      1+(warm?.20:-.08)*k,0,0,0,(warm?12:8)*k,
+      0,1+(warm?.08:.05)*k,0,0,(warm?6:10)*k,
+      0,0,1+(warm?-.12:.18)*k,0,(warm?-4:14)*k,
       0,0,0,1,0,
     ]);
   }
 
-  Future<Uint8List?> captureCanvas() async {
+  Future<Uint8List?> _renderPngBytes() async {
     try {
-      final boundary = canvasKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 3);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      return data?.buffer.asUint8List();
-    } catch (e) { message('Export failed: $e'); return null; }
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = _renderBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw StateError('Render boundary is not ready');
+      final ratio = _fullResolution ? 3.0 : 1.5;
+      final ui.Image image = await boundary.toImage(pixelRatio: ratio);
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        if (data == null) throw StateError('PNG encoding returned no data');
+        return data.buffer.asUint8List(data.offsetInBytes,data.lengthInBytes);
+      } finally { image.dispose(); }
+    } catch (e) { _message('Render failed: $e'); return null; }
   }
 
-  Future<void> exportImage({bool share = false}) async {
-    if (photo == null) { message('ابتدا یک عکس انتخاب کنید'); return; }
-    if (busy) return;
-    setState(() => busy = true);
+  Future<File?> _writePngFile(Uint8List bytes) async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/dou_expo_${DateTime.now().millisecondsSinceEpoch}.png');
+    await file.writeAsBytes(bytes,flush:true);
+    return file;
+  }
+
+  Future<void> _saveRenderedPhoto() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
     try {
-      final bytes = await captureCanvas();
+      final bytes = await _renderPngBytes();
       if (bytes == null) return;
-      final dir = Directory.systemTemp;
-      final file = File('${dir.path}/dou_expo_${DateTime.now().millisecondsSinceEpoch}.png');
-      await file.writeAsBytes(bytes, flush: true);
-      if (share) {
-        await Share.shareXFiles([XFile(file.path)], text: 'Created with Dou Expo');
-      } else {
-        await Gal.putImageBytes(bytes, name: 'dou_expo_${DateTime.now().millisecondsSinceEpoch}');
-        message('تصویر با موفقیت در گالری ذخیره شد');
-      }
-    } catch (e) { message('Save/share error: $e'); }
-    finally { if (mounted) setState(() => busy = false); }
+      await Gal.putImageBytes(bytes,name:'dou_expo_${DateTime.now().millisecondsSinceEpoch}',album:'Dou expo Beta');
+      _message('Rendered PNG saved to Gallery · Dou expo Beta');
+    } catch (e) { _message('Gallery save failed: $e'); }
+    finally { if (mounted) setState(() => _isExporting = false); }
   }
 
-  void openPatterns() {
-    showModalBottomSheet<void>(
-      context: context, backgroundColor: const Color(0xFF141418), isScrollControlled: true,
-      builder: (ctx) => SafeArea(child: SizedBox(height: MediaQuery.of(ctx).size.height*.68,
-        child: Column(children: [
-          const Padding(padding: EdgeInsets.all(18),child: Text('PATTERN BANK',style: TextStyle(fontWeight: FontWeight.bold,letterSpacing:2))),
-          Expanded(child: ListView.builder(itemCount: patterns.length,itemBuilder: (_,i) {
-            final p=patterns[i];
-            return ListTile(
-              leading: Container(width:54,height:38,decoration:BoxDecoration(borderRadius:BorderRadius.circular(8),gradient:LinearGradient(colors:p.colors))),
-              title:Text(p.name),subtitle:Text(p.category),
-              trailing: pattern?.name==p.name?const Icon(Icons.check,color:Color(0xFFFACC15)):null,
-              onTap:(){setState((){pattern=p; final idx=blends.indexWhere((b)=>b.$2==p.blend); if(idx>=0) blendIndex=idx;}); Navigator.pop(ctx);},
-            );
-          })),
-          TextButton.icon(onPressed:(){setState((){pattern=patterns[random.nextInt(patterns.length)];gradientIndex=random.nextInt(8);});Navigator.pop(ctx);},icon:const Icon(Icons.casino),label:const Text('RANDOM PATTERN')),
-        ]),
-      )),
-    );
+  Future<void> _shareRenderedPhoto() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      final bytes = await _renderPngBytes();
+      if (bytes == null) return;
+      final file = await _writePngFile(bytes);
+      if (file != null) await Share.shareXFiles([XFile(file.path)],text:'Created with Dou expo Beta · $_selectedFilterName');
+    } catch (e) { _message('Share failed: $e'); }
+    finally { if (mounted) setState(() => _isExporting = false); }
+  }
+
+  void _openPatternSheet() {
+    showModalBottomSheet<void>(context:context,backgroundColor:const Color(0xFF121216),isScrollControlled:true,
+      builder:(ctx)=>SafeArea(child:SizedBox(height:MediaQuery.of(ctx).size.height*.7,child:Column(children:[
+        const Padding(padding:EdgeInsets.all(16),child:Text('PATTERN BANK',style:TextStyle(fontWeight:FontWeight.bold,letterSpacing:2))),
+        Expanded(child:ListView.builder(itemCount:kPatternBank.length,itemBuilder:(_,i){
+          final p=kPatternBank[i];
+          return ListTile(
+            leading:Container(width:54,height:38,decoration:BoxDecoration(borderRadius:BorderRadius.circular(8),gradient:LinearGradient(colors:p.colors))),
+            title:Text(p.name),subtitle:Text(p.category),
+            trailing:_activePattern?.id==p.id?const Icon(Icons.check_circle,color:Color(0xFFFACC15)):null,
+            onTap:(){setState((){_activePattern=p;final idx=_blendModes.indexWhere((b)=>b.$2==p.defaultBlend);if(idx>=0)_blendIndex=idx;});Navigator.pop(ctx);},
+          );
+        })),
+        TextButton.icon(onPressed:(){_randomizePattern();Navigator.pop(ctx);},icon:const Icon(Icons.casino),label:const Text('RANDOM PATTERN')),
+      ]))));
+  }
+
+  void _openSettings() {
+    showModalBottomSheet<void>(context:context,backgroundColor:const Color(0xFF121216),
+      builder:(ctx)=>StatefulBuilder(builder:(ctx,setModal)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        const Padding(padding:EdgeInsets.all(16),child:Text('DOU EXPO · SETTINGS')),
+        SwitchListTile(title:const Text('Show Grid'),value:_showGrid,onChanged:(v){setModal(()=>_showGrid=v);setState(()=>_showGrid=v);}),
+        SwitchListTile(title:const Text('App Watermark'),value:_showWatermark,onChanged:(v){setModal(()=>_showWatermark=v);setState(()=>_showWatermark=v);}),
+        SwitchListTile(title:const Text('High Resolution Render'),value:_fullResolution,onChanged:(v)async{setModal(()=>_fullResolution=v);setState(()=>_fullResolution=v);if(_useLiveCamera)await _setupCameraAt(_cameraIndex);}),
+      ]))));
   }
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width >= 700;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('DOU EXPO',style:TextStyle(fontWeight:FontWeight.w800,letterSpacing:2)),
-        actions: [
-          IconButton(tooltip:'Patterns',onPressed:openPatterns,icon:const Icon(Icons.auto_awesome_mosaic_outlined)),
-          IconButton(tooltip:'Grid',onPressed:()=>setState(()=>showGrid=!showGrid),icon:Icon(Icons.grid_on,color:showGrid?const Color(0xFFFACC15):null)),
-          IconButton(tooltip:'Watermark',onPressed:()=>setState(()=>watermark=!watermark),icon:Icon(Icons.branding_watermark,color:watermark?const Color(0xFFFACC15):null)),
-        ],
-      ),
-      body: SafeArea(child: wide
-        ? Row(children:[Expanded(flex:6,child:_canvas()),const VerticalDivider(width:1),Expanded(flex:4,child:_controls())])
-        : Column(children:[Expanded(child:_canvas()),_controls()])),
-    );
+    return Scaffold(body:SafeArea(child:LayoutBuilder(builder:(context,c){
+      final wide=c.maxWidth>=700;
+      return wide
+        ? Row(children:[Expanded(flex:6,child:_buildCanvas()),const VerticalDivider(width:1,color:Colors.white12),Expanded(flex:4,child:_postStage?_buildPostPanel():_buildCapturePanel())])
+        : Column(children:[Expanded(child:_buildCanvas()),_postStage?_buildPostPanel():_buildCapturePanel()]);
+    })));
   }
 
-  Widget _canvas() {
-    final grad=directions[gradientIndex], blend=blends[blendIndex];
+  Widget _buildBaseLayer() {
+    final c=_cameraController;
+    if (_useLiveCamera && _cameraReady && c!=null && c.value.isInitialized) {
+      final size=c.value.previewSize;
+      return ClipRect(child:Transform.scale(
+        scale: size==null?1:(1/ (size.width/size.height)),
+        child:Center(child:CameraPreview(c)),
+      ));
+    }
+    if (_photo!=null) return Image.file(_photo!,fit:BoxFit.cover);
+    return Container(color:const Color(0xFF111116),child:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      const Icon(Icons.camera_alt_outlined,size:46,color:Colors.white38),
+      const SizedBox(height:10),Text(_useLiveCamera?'Starting camera…':'Choose a photo or start camera'),
+      const SizedBox(height:10),Wrap(spacing:8,children:[
+        OutlinedButton.icon(onPressed:_pickBaseImage,icon:const Icon(Icons.photo_library),label:const Text('Gallery')),
+        if(!_useLiveCamera) FilledButton.icon(onPressed:_toggleLiveCamera,icon:const Icon(Icons.videocam),label:const Text('Live camera')),
+      ]),
+    ])));
+  }
+
+  Widget _buildCanvas() {
+    final blend=_blendModes[_blendIndex],grad=_gradientDirs[_gradientDirIndex];
     return Column(children:[
-      Padding(padding:const EdgeInsets.symmetric(horizontal:12,vertical:4),child:Row(children:[
-        IconButton(onPressed:()=>setState(()=>luminant=!luminant),icon:Icon(Icons.contrast,color:luminant?const Color(0xFFFACC15):null)),
-        IconButton(onPressed:()=>setState(()=>gradientIndex=(gradientIndex+1)%8),icon:const Icon(Icons.gradient)),
+      Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),child:Row(children:[
+        IconButton(onPressed:_openSettings,icon:const Icon(Icons.settings_outlined)),
+        IconButton(onPressed:_openPatternSheet,icon:const Icon(Icons.auto_awesome_mosaic_outlined)),
+        IconButton(onPressed:()=>setState(()=>_luminantMode=!_luminantMode),icon:Icon(Icons.contrast,color:_luminantMode?const Color(0xFFFACC15):null)),
+        IconButton(onPressed:()=>setState(()=>_gradientDirIndex=(_gradientDirIndex+1)%8),icon:const Icon(Icons.gradient)),
+        IconButton(onPressed:_toggleLiveCamera,icon:Icon(_useLiveCamera?Icons.videocam:Icons.photo_outlined,color:_useLiveCamera?const Color(0xFFFACC15):null)),
+        IconButton(onPressed:_switchCameraLens,icon:const Icon(Icons.cameraswitch_outlined)),
         const Spacer(),
-        TextButton(onPressed:()=>setState(()=>ratioIndex=(ratioIndex+1)%ratios.length),child:Text(ratios[ratioIndex].$1)),
+        TextButton(onPressed:()=>setState(()=>_ratioIndex=(_ratioIndex+1)%3),child:Text(_ratios[_ratioIndex].$1)),
       ])),
-      Expanded(child:Center(child:Padding(padding:const EdgeInsets.all(12),child:AspectRatio(
-        aspectRatio:ratios[ratioIndex].$2,
+      Expanded(child:Center(child:Padding(padding:const EdgeInsets.all(12),child:AspectRatio(aspectRatio:_ratios[_ratioIndex].$2,
         child:GestureDetector(
-          onHorizontalDragEnd:(d){final v=d.primaryVelocity??0;if(v.abs()>100)cycleBlend(v<0?1:-1);},
-          child:RepaintBoundary(key:canvasKey,child:ClipRRect(borderRadius:BorderRadius.circular(18),child:ColorFiltered(
-            colorFilter:postFilter,
+          onHorizontalDragEnd:(d){final v=d.primaryVelocity??0;if(v.abs()>120)_cycleBlend(v<0?1:-1);},
+          child:RepaintBoundary(key:_renderBoundaryKey,child:ClipRRect(borderRadius:BorderRadius.circular(20),child:ColorFiltered(
+            colorFilter:_activePostColorFilter(),
             child:Stack(fit:StackFit.expand,children:[
-              if(photo!=null) Image.file(photo!,fit:BoxFit.cover) else Container(color:const Color(0xFF191920),child:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
-                const Icon(Icons.photo_library_outlined,size:48,color:Colors.white38),const SizedBox(height:12),
-                const Text('SELECT A BASE PHOTO'),const SizedBox(height:12),
-                FilledButton.icon(onPressed:()=>chooseImage(ImageSource.gallery),icon:const Icon(Icons.add_photo_alternate),label:const Text('Choose photo')),
-              ]))),
-              if(pattern!=null) Opacity(opacity:opacity,child:ColorFiltered(
-                colorFilter:ColorFilter.mode(Colors.white.withOpacity(luminant ? .65 : 1),blend.$2),
-                child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:grad.$1,end:grad.$2,colors:pattern!.colors))),
-              )),
-              if(showGrid) IgnorePointer(child:CustomPaint(painter:GridPainter())),
+              _buildBaseLayer(),
+              if(_activePattern!=null)AnimatedOpacity(duration:const Duration(milliseconds:160),opacity:_transparency.clamp(.05,1),
+                child:ColorFiltered(colorFilter:ColorFilter.mode(Colors.white.withValues(alpha:_luminantMode?.65:1),blend.$2),
+                  child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:grad.$1,end:grad.$2,colors:_activePattern!.colors))))),
+              if(_showGrid)IgnorePointer(child:CustomPaint(painter:_GridPainter())),
               Positioned(top:10,left:10,child:_pill('DOU EXPO · BETA')),
               Positioned(top:10,right:10,child:_pill(blend.$1)),
-              if(watermark) const Positioned(bottom:10,right:12,child:Text('DOU EXPO',style:TextStyle(letterSpacing:2,color:Colors.white70,fontSize:10))),
+              if(_showWatermark)const Positioned(bottom:10,right:12,child:Text('DOU EXPO BETA',style:TextStyle(fontSize:10,letterSpacing:1.5,color:Colors.white54))),
             ]),
           ))),
         ),
@@ -218,43 +360,38 @@ class _StudioScreenState extends State<StudioScreen> {
     ]);
   }
 
-  Widget _pill(String label)=>Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:5),decoration:BoxDecoration(color:Colors.black54,borderRadius:BorderRadius.circular(20)),child:Text(label,style:const TextStyle(fontSize:10,letterSpacing:1)));
+  Widget _pill(String t)=>Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:5),decoration:BoxDecoration(color:Colors.black54,borderRadius:BorderRadius.circular(20),border:Border.all(color:Colors.white12)),child:Text(t,style:const TextStyle(fontSize:10,letterSpacing:1)));
 
-  Widget _controls() {
-    return Container(padding:const EdgeInsets.fromLTRB(16,10,16,16),decoration:const BoxDecoration(color:Color(0xFF141418),borderRadius:BorderRadius.vertical(top:Radius.circular(22))),child:postStage?_postControls():_editControls());
-  }
-
-  Widget _editControls()=>Column(mainAxisSize:MainAxisSize.min,children:[
-    Row(children:[const Text('PATTERN OPACITY',style:TextStyle(fontSize:10,color:Colors.white60)),Expanded(child:Slider(value:opacity,onChanged:(v)=>setState(()=>opacity=v))),Text('${(opacity*100).round()}%')]),
+  Widget _buildCapturePanel()=>Container(padding:const EdgeInsets.fromLTRB(16,8,16,16),decoration:const BoxDecoration(color:Color(0xFF121216),borderRadius:BorderRadius.vertical(top:Radius.circular(22))),child:Column(mainAxisSize:MainAxisSize.min,children:[
+    Row(children:[const Text('PATTERN OPACITY',style:TextStyle(fontSize:10,color:Colors.white60)),Expanded(child:Slider(value:_transparency,onChanged:(v)=>setState(()=>_transparency=v))),Text('${(_transparency*100).round()}%')]),
     Row(mainAxisAlignment:MainAxisAlignment.spaceAround,children:[
-      IconButton(tooltip:'Gallery',onPressed:()=>chooseImage(ImageSource.gallery),icon:const Icon(Icons.photo_library_outlined)),
-      IconButton(tooltip:'Camera',onPressed:()=>chooseImage(ImageSource.camera),icon:const Icon(Icons.camera_alt_outlined)),
-      IconButton(tooltip:'Random pattern',onPressed:(){HapticFeedback.mediumImpact();setState(()=>pattern=patterns[random.nextInt(patterns.length)]);},icon:const Icon(Icons.casino_outlined)),
-      GestureDetector(onTap:openPatterns,child:const Icon(Icons.layers_outlined,size:26)),
-      IconButton(tooltip:'Clear pattern',onPressed:()=>setState(()=>pattern=null),icon:const Icon(Icons.layers_clear)),
-      FilledButton(onPressed:photo==null?null:()=>setState(()=>postStage=true),child:const Text('NEXT')),
+      IconButton(onPressed:_pickBaseImage,icon:const Icon(Icons.photo_library_outlined)),
+      IconButton(onPressed:_randomizePattern,icon:const Icon(Icons.casino_outlined)),
+      GestureDetector(onTap:_useLiveCamera?_capturePhoto:(_photo!=null?()=>setState(()=>_postStage=true):_toggleLiveCamera),child:Container(width:60,height:60,decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:Colors.white,width:3),color:const Color(0xFFFACC15).withValues(alpha:.2)),child:Icon(_useLiveCamera?Icons.camera_alt_rounded:Icons.check_rounded))),
+      IconButton(onPressed:()=>setState(()=>_activePattern=null),icon:const Icon(Icons.layers_clear)),
+      IconButton(onPressed:_openPatternSheet,icon:const Icon(Icons.style_outlined)),
     ]),
-    Text('Swipe left/right on the image to change blend mode',style:TextStyle(color:Colors.white38,fontSize:10)),
-  ]);
+    Text(_useLiveCamera?'Live camera · tap shutter to capture':'Photo mode · tap shutter to continue',style:const TextStyle(fontSize:10,color:Colors.white38)),
+  ]));
 
-  Widget _postControls()=>Column(mainAxisSize:MainAxisSize.min,children:[
+  Widget _buildPostPanel()=>Container(padding:const EdgeInsets.fromLTRB(16,10,16,16),decoration:const BoxDecoration(color:Color(0xFF121216),borderRadius:BorderRadius.vertical(top:Radius.circular(22))),child:Column(mainAxisSize:MainAxisSize.min,children:[
     Row(children:[
-      IconButton(onPressed:()=>setState(()=>postStage=false),icon:const Icon(Icons.arrow_back)),
-      const Text('FINAL LOOK',style:TextStyle(fontWeight:FontWeight.bold,letterSpacing:1)),
-      const Spacer(),
-      IconButton(onPressed:busy?null:()=>exportImage(),icon:const Icon(Icons.save_alt,color:Color(0xFFFACC15))),
-      IconButton(onPressed:busy?null:()=>exportImage(share:true),icon:const Icon(Icons.share)),
+      IconButton(onPressed:()=>setState(()=>_postStage=false),icon:const Icon(Icons.undo_rounded)),
+      Expanded(child:Slider(value:_filterIntensity,onChanged:(v)=>setState(()=>_filterIntensity=v))),
+      IconButton(onPressed:_isExporting?null:_saveRenderedPhoto,icon:const Icon(Icons.save_alt,color:Color(0xFFFACC15))),
+      IconButton(onPressed:_isExporting?null:_shareRenderedPhoto,icon:const Icon(Icons.share)),
     ]),
-    Row(children:[const Text('INTENSITY',style:TextStyle(fontSize:10,color:Colors.white60)),Expanded(child:Slider(value:filterStrength,onChanged:(v)=>setState(()=>filterStrength=v)))]),
-    SizedBox(height:42,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:filters.length,separatorBuilder:(_,__)=>const SizedBox(width:6),itemBuilder:(_,i)=>ChoiceChip(label:Text(filters[i]),selected:filterName==filters[i],onSelected:(_)=>setState(()=>filterName=filters[i])))),
-    if(busy) const LinearProgressIndicator(),
-  ]);
+    SizedBox(height:40,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:_filterPresets.length,separatorBuilder:(_,__)=>const SizedBox(width:7),itemBuilder:(_,i){
+      final n=_filterPresets[i];return ChoiceChip(label:Text(n),selected:_selectedFilterName==n,onSelected:(_)=>setState(()=>_selectedFilterName=n));
+    })),
+    if(_isExporting)const LinearProgressIndicator(),
+  ]));
 }
 
-class GridPainter extends CustomPainter {
+class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas,Size size) {
-    final p=Paint()..color=Colors.white.withOpacity(.35)..strokeWidth=.7;
+    final p=Paint()..color=Colors.white24..strokeWidth=.7;
     for(var i=1;i<3;i++){final x=size.width*i/3,y=size.height*i/3;canvas.drawLine(Offset(x,0),Offset(x,size.height),p);canvas.drawLine(Offset(0,y),Offset(size.width,y),p);}
   }
   @override

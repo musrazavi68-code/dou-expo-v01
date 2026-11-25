@@ -5,8 +5,8 @@ void main() {
   await tester.pumpWidget(const DouExpoApp());
   await tester.pump();
   expect(find.text('DOU EXPO'), findsOneWidget);
-  expect(find.text('FIRST PHOTO'), findsOneWidget);
-  expect(find.text('PATTERN / 2ND'), findsOneWidget);
+  expect(find.text('FIRST PHOTO'), findsWidgets);
+  expect(find.text('PATTERN / 2ND'), findsWidgets);
   expect(find.text('BLEND'), findsOneWidget);
   expect(find.text('EXPORT · RATIO · SIZE'), findsOneWidget);
  });

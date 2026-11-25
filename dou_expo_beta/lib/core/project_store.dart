@@ -5,58 +5,88 @@ import 'package:path_provider/path_provider.dart';
 import 'project_document.dart';
 
 /// Stores editable projects and their source assets in app-private storage.
+/// Reads never create directories; writes use temporary files before publish.
 class ProjectStore {
   static const _folder = 'dou_expo_projects';
+  static final _safeId = RegExp(r'^[A-Za-z0-9_-]{1,80}$');
+  static final _safeFileName = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$');
 
-  Future<Directory> _root() async {
+  Future<Directory> _root({required bool create}) async {
     final support = await getApplicationSupportDirectory();
     final root = Directory('${support.path}/$_folder');
-    await root.create(recursive: true);
+    if (create) await root.create(recursive: true);
     return root;
   }
 
-  Future<Directory> _projectDirectory(String id) async {
-    if (id.isEmpty || id.contains('/') || id.contains('..')) {
+  void _validateId(String id) {
+    if (!_safeId.hasMatch(id) || id == '.' || id == '..') {
       throw ArgumentError.value(id, 'id', 'Invalid project identifier');
     }
-    final dir = Directory('${(await _root()).path}/$id');
-    await dir.create(recursive: true);
+  }
+
+  void _validateFileName(String fileName) {
+    if (!_safeFileName.hasMatch(fileName) ||
+        fileName == '.' ||
+        fileName == '..' ||
+        fileName.endsWith('.tmp')) {
+      throw ArgumentError.value(fileName, 'fileName', 'Invalid asset name');
+    }
+  }
+
+  Future<Directory> _projectDirectory(String id, {required bool create}) async {
+    _validateId(id);
+    final root = await _root(create: create);
+    final dir = Directory('${root.path}/$id');
+    if (create) {
+      await dir.create(recursive: true);
+    } else if (!await dir.exists()) {
+      throw FileSystemException('Project directory does not exist', dir.path);
+    }
     return dir;
   }
 
   Future<String> saveAsset(String projectId, String fileName, List<int> bytes) async {
-    if (fileName.isEmpty || fileName.contains('/') || fileName.contains('..')) {
-      throw ArgumentError.value(fileName, 'fileName', 'Invalid asset name');
-    }
-    final dir = await _projectDirectory(projectId);
+    _validateFileName(fileName);
+    final dir = await _projectDirectory(projectId, create: true);
     final assets = Directory('${dir.path}/assets');
     await assets.create(recursive: true);
-    final file = File('${assets.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
+    final target = File('${assets.path}/$fileName');
+    final temporary = File('${assets.path}/$fileName.tmp');
+    try {
+      await temporary.writeAsBytes(bytes, flush: true);
+      await temporary.rename(target.path);
+    } on FileSystemException {
+      // On filesystems that cannot replace an existing file with rename,
+      // remove the old asset only after the new bytes are fully written.
+      if (!await temporary.exists()) rethrow;
+      if (await target.exists()) await target.delete();
+      await temporary.rename(target.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
     return 'assets/$fileName';
   }
 
   Future<File> resolveAsset(String projectId, String relativePath) async {
-    if (!relativePath.startsWith('assets/') || relativePath.contains('..')) {
+    if (!relativePath.startsWith('assets/')) {
       throw ArgumentError.value(relativePath, 'relativePath', 'Invalid project asset path');
     }
-    final dir = await _projectDirectory(projectId);
-    final file = File('${dir.path}/$relativePath');
+    final fileName = relativePath.substring('assets/'.length);
+    _validateFileName(fileName);
+    final dir = await _projectDirectory(projectId, create: false);
+    final file = File('${dir.path}/assets/$fileName');
     if (!await file.exists()) throw FileSystemException('Project asset missing', file.path);
     return file;
   }
 
   Future<void> save(ProjectDocument document) async {
-    final dir = await _projectDirectory(document.id);
+    final dir = await _projectDirectory(document.id, create: true);
     final target = File('${dir.path}/project.json');
     final temporary = File('${dir.path}/project.json.tmp');
     await temporary.writeAsString(document.encode(), flush: true);
-    // Rename the fully flushed temporary file over the previous manifest.
-    // Keep the previous manifest intact if writing the new one fails.
     try {
       await temporary.rename(target.path);
     } on FileSystemException {
-      // Some filesystems do not replace an existing destination on rename.
       final backup = File('${dir.path}/project.json.bak');
       if (await backup.exists()) await backup.delete();
       if (await target.exists()) await target.rename(backup.path);
@@ -69,29 +99,44 @@ class ProjectStore {
         }
         rethrow;
       }
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
     }
   }
 
   Future<ProjectDocument?> load(String id) async {
-    final dir = await _projectDirectory(id);
+    _validateId(id);
+    final root = await _root(create: false);
+    final dir = Directory('${root.path}/$id');
+    if (!await dir.exists()) return null;
     final file = File('${dir.path}/project.json');
     if (!await file.exists()) return null;
-    return ProjectDocument.decode(await file.readAsString());
+    final project = ProjectDocument.decode(await file.readAsString());
+    if (project.id != id) {
+      throw FormatException('Project manifest identifier does not match its directory');
+    }
+    return project;
   }
 
   Future<List<ProjectDocument>> list() async {
-    final root = await _root();
+    final root = await _root(create: false);
+    if (!await root.exists()) return const [];
     final projects = <ProjectDocument>[];
     await for (final entity in root.list(followLinks: false)) {
       if (entity is! Directory) continue;
       final file = File('${entity.path}/project.json');
       if (!await file.exists()) continue;
       try {
-        projects.add(ProjectDocument.decode(await file.readAsString()));
+        final project = ProjectDocument.decode(await file.readAsString());
+        if (project.id == entity.uri.pathSegments.where((s) => s.isNotEmpty).last) {
+          projects.add(project);
+        }
       } on FormatException {
-        // Ignore a damaged project index entry; never crash the project browser.
+        // Keep damaged projects on disk; omit them from the browser.
       } on TypeError {
-        // Ignore incompatible metadata and leave the original files untouched.
+        // Keep incompatible metadata on disk; omit it from the browser.
+      } on ArgumentError {
+        // Invalid identifiers or fields are not exposed as valid projects.
       }
     }
     projects.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -99,7 +144,9 @@ class ProjectStore {
   }
 
   Future<void> delete(String id) async {
-    final dir = await _projectDirectory(id);
+    _validateId(id);
+    final root = await _root(create: false);
+    final dir = Directory('${root.path}/$id');
     if (await dir.exists()) await dir.delete(recursive: true);
   }
 }

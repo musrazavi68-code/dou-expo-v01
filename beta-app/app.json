@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Dou Expo",
+    "slug": "dou-expo-beta",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#08090B"
+    },
+    "android": {
+      "package": "com.douexpo.studio",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#08090B"
+      }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "اجازه دسترسی برای انتخاب تصاویر و ساخت دابل اکسپوژر لازم است."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "برای ذخیره خروجی در گالری اجازه لازم است.",
+          "savePhotosPermission": "برای ذخیره خروجی در گالری اجازه لازم است."
+        }
+      ]
+    ],
+    "extra": {
+      "beta": true,
+      "versionLabel": "BETA 1.0.0"
+    }
+  }
+}

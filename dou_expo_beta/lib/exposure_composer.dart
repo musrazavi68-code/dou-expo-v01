@@ -7,6 +7,13 @@ import 'package:material_ui/material_ui.dart';
 /// Controls where the second exposure is allowed to appear.
 enum OverlayMaskMode { fullFrame, insidePortrait, outsidePortrait }
 
+class MaskStroke {
+  const MaskStroke({required this.path, required this.width, this.erase = false});
+  final Path path;
+  final double width;
+  final bool erase;
+}
+
 /// Real two-image compositor. The second exposure is painted with a true
 /// Porter-Duff blend mode; it is not a decorative gradient overlay.
 class ExposureComposer {
@@ -70,6 +77,7 @@ class ExposureComposer {
     required double overlayScale,
     required OverlayMaskMode maskMode,
     double maskFeather = 0,
+    List<MaskStroke> maskStrokes = const [],
   }) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -92,32 +100,74 @@ class ExposureComposer {
         width: destination.width * overlayScale,
         height: destination.height * overlayScale,
       );
-      final mask = portraitMaskPath(size);
-      if (maskMode != OverlayMaskMode.fullFrame) {
-        canvas.saveLayer(Offset.zero & size, Paint());
-      }
-      canvas.drawImageRect(
-        overlay,
-        Rect.fromLTWH(0, 0, overlay.width.toDouble(), overlay.height.toDouble()),
-        scaled,
-        Paint()
-          ..filterQuality = FilterQuality.high
-          ..blendMode = blendMode
-          ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
-          ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
-      );
-      if (maskMode != OverlayMaskMode.fullFrame) {
-        canvas.drawPath(
-          mask,
+      if (maskMode == OverlayMaskMode.fullFrame && maskStrokes.isEmpty) {
+        canvas.drawImageRect(
+          overlay,
+          Rect.fromLTWH(0, 0, overlay.width.toDouble(), overlay.height.toDouble()),
+          scaled,
           Paint()
-            ..color = const Color(0xFFFFFFFF)
-            ..blendMode = maskMode == OverlayMaskMode.insidePortrait
-                ? BlendMode.dstIn
-                : BlendMode.dstOut
-            ..maskFilter = maskFeather > 0
-                ? MaskFilter.blur(BlurStyle.normal, maskFeather)
-                : null,
+            ..filterQuality = FilterQuality.high
+            ..blendMode = blendMode
+            ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
+            ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
         );
+      } else {
+        canvas.saveLayer(Offset.zero & size, Paint());
+        canvas.drawImageRect(
+          overlay,
+          Rect.fromLTWH(0, 0, overlay.width.toDouble(), overlay.height.toDouble()),
+          scaled,
+          Paint()
+            ..filterQuality = FilterQuality.high
+            ..blendMode = blendMode
+            ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
+            ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
+        );
+        canvas.saveLayer(Offset.zero & size, Paint());
+        final maskPaint = Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..style = PaintingStyle.fill
+          ..maskFilter = maskFeather > 0
+              ? MaskFilter.blur(BlurStyle.normal, maskFeather)
+              : null;
+        if (maskMode == OverlayMaskMode.fullFrame) {
+          canvas.drawRect(Offset.zero & size, maskPaint);
+        } else {
+          canvas.drawPath(portraitMaskPath(size), maskPaint);
+          if (maskMode == OverlayMaskMode.outsidePortrait) {
+            canvas.drawRect(
+              Offset.zero & size,
+              Paint()..color = const Color(0xFFFFFFFF),
+            );
+            canvas.drawPath(
+              portraitMaskPath(size),
+              Paint()
+                ..color = const Color(0x00000000)
+                ..blendMode = BlendMode.clear
+                ..maskFilter = maskFeather > 0
+                    ? MaskFilter.blur(BlurStyle.normal, maskFeather)
+                    : null,
+            );
+          }
+        }
+        for (final stroke in maskStrokes) {
+          canvas.drawPath(
+            stroke.path,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..strokeWidth = stroke.width
+              ..color = stroke.erase
+                  ? const Color(0x00000000)
+                  : const Color(0xFFFFFFFF)
+              ..blendMode = stroke.erase ? BlendMode.clear : BlendMode.srcOver
+              ..maskFilter = maskFeather > 0
+                  ? MaskFilter.blur(BlurStyle.normal, maskFeather)
+                  : null,
+          );
+        }
+        canvas.restore();
         canvas.restore();
       }
     }
@@ -137,6 +187,7 @@ class ExposureComposer {
     required double overlayScale,
     required OverlayMaskMode maskMode,
     double maskFeather = 0,
+    List<MaskStroke> maskStrokes = const [],
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -153,6 +204,7 @@ class ExposureComposer {
       overlayScale: overlayScale,
       maskMode: maskMode,
       maskFeather: maskFeather,
+      maskStrokes: maskStrokes,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
@@ -179,6 +231,7 @@ class ExposurePreviewPainter extends CustomPainter {
     required this.overlayScale,
     required this.maskMode,
     this.maskFeather = 0,
+    this.maskStrokes = const [],
   });
 
   final ui.Image? base;
@@ -191,6 +244,7 @@ class ExposurePreviewPainter extends CustomPainter {
   final double overlayScale;
   final OverlayMaskMode maskMode;
   final double maskFeather;
+  final List<MaskStroke> maskStrokes;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -210,6 +264,7 @@ class ExposurePreviewPainter extends CustomPainter {
       overlayScale: overlayScale,
       maskMode: maskMode,
       maskFeather: maskFeather,
+      maskStrokes: maskStrokes,
     );
   }
 
@@ -224,5 +279,6 @@ class ExposurePreviewPainter extends CustomPainter {
       old.overlayOffset != overlayOffset ||
       old.overlayScale != overlayScale ||
       old.maskMode != maskMode ||
-      old.maskFeather != maskFeather;
+      old.maskFeather != maskFeather ||
+      old.maskStrokes != maskStrokes;
 }

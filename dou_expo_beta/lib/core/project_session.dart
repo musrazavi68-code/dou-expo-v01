@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import 'history_stack.dart';
@@ -11,9 +9,9 @@ import 'project_store.dart';
 class ProjectSession extends ChangeNotifier {
   ProjectSession._({
     required ProjectDocument initial,
-    required Future<void> Function(ProjectDocument) this._persist,
-    required Future<ProjectDocument?> Function(String) this._restore,
-    required Future<String> Function(String, String, List<int>) this._writeAsset,
+    required this._persist,
+    required this._restore,
+    required this._writeAsset,
     required int historyCapacity,
   })  : _history = HistoryStack<ProjectDocument>(
           initial: initial,

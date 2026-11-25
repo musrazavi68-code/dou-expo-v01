@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dou_expo_beta/exposure_composer.dart';
@@ -13,8 +14,8 @@ Future<ui.Image> _solidImage(int width, int height, ui.Color color) async {
   return image;
 }
 
-Future<ui.Color> _pixel(Uint8ListLike bytes, int width, int x, int y) async {
-  final codec = await ui.instantiateImageCodec(bytes.data);
+Future<ui.Color> _pixel(Uint8List bytes, int width, int x, int y) async {
+  final codec = await ui.instantiateImageCodec(bytes);
   final frame = await codec.getNextFrame();
   final data = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
   final offset = (y * width + x) * 4;
@@ -27,11 +28,6 @@ Future<ui.Color> _pixel(Uint8ListLike bytes, int width, int x, int y) async {
   frame.image.dispose();
   codec.dispose();
   return color;
-}
-
-class Uint8ListLike {
-  const Uint8ListLike(this.data);
-  final List<int> data;
 }
 
 void main() {
@@ -63,9 +59,9 @@ void main() {
 
       final inside = await render(OverlayMaskMode.insidePortrait);
       final outside = await render(OverlayMaskMode.outsidePortrait);
-      final insideCenter = await _pixel(Uint8ListLike(inside), 20, 10, 5);
+      final insideCenter = await _pixel(Uint8List.fromList(inside), 20, 10, 5);
       final insideCorner = await _pixel(Uint8ListLike(inside), 20, 0, 0);
-      final outsideCenter = await _pixel(Uint8ListLike(outside), 20, 10, 5);
+      final outsideCenter = await _pixel(Uint8List.fromList(outside), 20, 10, 5);
       final outsideCorner = await _pixel(Uint8ListLike(outside), 20, 0, 0);
 
       expect(insideCenter.blue, greaterThan(insideCenter.red));

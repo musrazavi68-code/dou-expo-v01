@@ -1,18 +1,175 @@
 {
-  "title":"Dou Expo Persian & Heritage Stencil Bank",
-  "version":1,
-  "items":[
-    {"id":"senmurv","title":"Senmurv / Simurgh","category":"Persian mythology","asset":"assets/stencils/senmurv.svg","license_note":"User-provided visual reference; simplified original vector interpretation."},
-    {"id":"azerbaijan-symbol-atlas","title":"Regional solid-symbol atlas","category":"Heritage symbols","asset":"assets/stencils/heritage_atlas.svg","license_note":"Original simplified vector set inspired by the user-provided icon-sheet reference."},
-    {"id":"tree","title":"Tree silhouette","category":"Nature"},
-    {"id":"cypress","title":"Cypress","category":"Persian nature"},
-    {"id":"lotus","title":"Lotus","category":"Achaemenid ornament"},
-    {"id":"winged-bull","title":"Winged bull","category":"Achaemenid ornament"},
-    {"id":"persian-arch","title":"Persian arch","category":"Architecture"},
-    {"id":"laurel","title":"Laurel wreath","category":"Ornament"},
-    {"id":"pomegranate","title":"Pomegranate","category":"Persian symbols"},
-    {"id":"carpet","title":"Carpet medallion","category":"Textile"}
+  "title": "Dou Expo Persian & Heritage Stencil Bank",
+  "version": 2,
+  "sourceReference": "Six user-uploaded reference images supplied on 2026-11-25. Reference sheets guide categories and visual style; all bundled vectors are original simplified silhouettes, not copied stock artwork.",
+  "items": [
+    {
+      "id": "senmurv",
+      "title": "Senmurv / Simurgh",
+      "category": "Persian mythology",
+      "asset": "assets/stencils/senmurv.svg",
+      "license_note": "Vector interpretation inspired by the user-uploaded Senmurv reference."
+    },
+    {
+      "id": "map",
+      "title": "Regional map silhouette",
+      "category": "Regional symbols",
+      "asset": "builtin:StencilKind.map",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "flag",
+      "title": "Flag / banner",
+      "category": "Regional symbols",
+      "asset": "builtin:StencilKind.flag",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "monument",
+      "title": "Monument / memorial",
+      "category": "Architecture",
+      "asset": "builtin:StencilKind.monument",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "flame",
+      "title": "Flame",
+      "category": "Symbols",
+      "asset": "builtin:StencilKind.flame",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "hand",
+      "title": "Raised hand",
+      "category": "Symbols",
+      "asset": "builtin:StencilKind.hand",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "broken-chain",
+      "title": "Broken chain",
+      "category": "Symbols",
+      "asset": "builtin:StencilKind.brokenChain",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "people",
+      "title": "People / community",
+      "category": "Human figures",
+      "asset": "builtin:StencilKind.people",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "skyline",
+      "title": "City skyline",
+      "category": "Architecture",
+      "asset": "builtin:StencilKind.skyline",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "tower",
+      "title": "Tower / landmark",
+      "category": "Architecture",
+      "asset": "builtin:StencilKind.tower",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "carpet",
+      "title": "Carpet medallion",
+      "category": "Persian textile",
+      "asset": "builtin:StencilKind.carpet",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "lute",
+      "title": "Lute",
+      "category": "Persian music",
+      "asset": "builtin:StencilKind.lute",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "pomegranate",
+      "title": "Pomegranate",
+      "category": "Persian symbols",
+      "asset": "builtin:StencilKind.pomegranate",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "laurel",
+      "title": "Laurel branch",
+      "category": "Ornament",
+      "asset": "builtin:StencilKind.laurel",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "wreath",
+      "title": "Laurel wreath",
+      "category": "Ornament",
+      "asset": "builtin:StencilKind.wreath",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "tree",
+      "title": "Tree silhouette",
+      "category": "Nature",
+      "asset": "builtin:StencilKind.tree",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "cypress",
+      "title": "Cypress",
+      "category": "Persian nature",
+      "asset": "builtin:StencilKind.cypress",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "lotus",
+      "title": "Achaemenid lotus",
+      "category": "Achaemenid ornament",
+      "asset": "builtin:StencilKind.lotus",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "winged-bull",
+      "title": "Winged bull",
+      "category": "Achaemenid ornament",
+      "asset": "builtin:StencilKind.wingedBull",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "persian-arch",
+      "title": "Persian arch",
+      "category": "Architecture",
+      "asset": "builtin:StencilKind.arch",
+      "license_note": "Original built-in vector silhouette."
+    },
+    {
+      "id": "persian-guard",
+      "title": "Persian guard silhouette",
+      "category": "Historical figures",
+      "asset": "builtin:StencilKind.persianGuard",
+      "license_note": "Original generic silhouette; not a historically exact reconstruction."
+    },
+    {
+      "id": "royal-head",
+      "title": "Royal profile",
+      "category": "Historical figures",
+      "asset": "builtin:StencilKind.royalHead",
+      "license_note": "Original generic profile silhouette."
+    },
+    {
+      "id": "lion-shield",
+      "title": "Lion shield",
+      "category": "Persian emblems",
+      "asset": "builtin:StencilKind.lionShield",
+      "license_note": "Original emblem silhouette."
+    }
   ],
-  "modes":["photo","pure-white","tinted","textured","noise"],
-  "compositing":"Stencil clips the second exposure; it is not a gradient overlay."
+  "modes": [
+    "photo",
+    "pure-white",
+    "tinted"
+  ],
+  "compositing": "The selected stencil clips the second exposure. It is a true double-exposure mask, not a gradient overlay.",
+  "editing": "All silhouettes are recolorable by the user and support image-two clipping and complementary color sampling."
 }

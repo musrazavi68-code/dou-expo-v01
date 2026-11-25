@@ -130,20 +130,16 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
        items:const [72,150,300,600].map((v)=>DropdownMenuItem(value:v,child:Text('$v DPI'))).toList(),
        onChanged:(v){if(v!=null)ss(()=>dpi=v);})]),
      ],
-     const SizedBox(height:8),const Text('File format'),
-     Wrap(spacing:6,children:[
-      ChoiceChip(label:const Text('PNG · lossless'),selected:format=='PNG',onSelected:(_)=>ss(()=>format='PNG')),
-      ChoiceChip(label:const Text('JPEG · 95%'),selected:format=='JPEG',onSelected:(_)=>ss(()=>format='JPEG')),
-     ]),
+     const SizedBox(height:8),const Text('File format: PNG · lossless'),
      FilledButton.icon(onPressed:(){final outputSize=unit=='cm'?(cm/2.54*dpi).round():sizes[si].$2;
       Navigator.pop(ctx);_save(_ratios[ri].$2,outputSize);},
       icon:const Icon(Icons.file_download),label:const Text('EXPORT PNG'))
     ])))));
  }
- Future<void> _save(double ratio,int size,{bool jpeg=false}) async {
+ Future<void> _save(double ratio,int size) async {
   if(_busy)return;setState(()=>_busy=true);
-  try{var bytes=await _render(ratio,size);if(jpeg){final image=await ExposureComposer.decode(bytes);try{final data=await image.toByteData(format:ui.ImageByteFormat.jpeg,quality:95);if(data==null)throw StateError('JPEG encoding failed');bytes=data.buffer.asUint8List(data.offsetInBytes,data.lengthInBytes);}finally{image.dispose();}}await Gal.putImageBytes(bytes,
-   name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString(),album:'Dou Expo');_toast((jpeg?'JPEG':'PNG')+' saved to Gallery');}
+  try{final bytes=await _render(ratio,size);await Gal.putImageBytes(bytes,
+   name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString(),album:'Dou Expo');_toast('PNG saved to Gallery');}
   catch(e){_toast('Export failed: '+e.toString());}finally{if(mounted)setState(()=>_busy=false);}
  }
  Future<void> _share() async {

@@ -65,9 +65,9 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    final back=_available.where((x)=>x.lensDirection==CameraLensDirection.back).toList();
    final selected=back.isNotEmpty?back.first:_available.first;
    candidate=CameraController(selected,ResolutionPreset.high,enableAudio:false);
-   await candidate!.initialize();final z=await candidate!.getMaxZoomLevel();
-   final minEv=await candidate!.getMinExposureOffset();final maxEv=await candidate!.getMaxExposureOffset();
-   if(!mounted||!_appActive){await candidate!.dispose();return;}
+   await candidate.initialize();final z=await candidate.getMaxZoomLevel();
+   final minEv=await candidate.getMinExposureOffset();final maxEv=await candidate.getMaxExposureOffset();
+   if(!mounted||!_appActive){await candidate.dispose();return;}
    setState(() {_camera=candidate;_ready=true;_maxZoom=z;_minEv=minEv;_maxEv=maxEv;_ev=0;_zoom=1;});
   }catch(e){await candidate?.dispose();if(mounted&&_appActive)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Camera unavailable: $e')));}
   finally{_cameraInitializing=false;}
@@ -90,12 +90,12 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    final developed=await _applyFilm(await File(shot.path).readAsBytes(),_film);
    await Gal.putImageBytes(developed,name:'ordinary_'+DateTime.now().millisecondsSinceEpoch.toString()+'.jpg',album:'Dou Expo');
    if(mounted){
-    setState(()=>{_lastShot=XFile(shot.path),_lastShotBytes=developed});
+    setState(() { _lastShot = XFile(shot.path); _lastShotBytes = developed; });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Saved $_film · one exposure')));
    }
   }catch(e){
    if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Capture failed: $e')));
-  }finally{if(mounted)setState(()=>{_busy=false,_countdown=0});}
+  }finally{if(mounted)setState(() { _busy = false; _countdown = 0; });}
  }
  Future<void> _flip() async {
   if(_available.length<2||_cameraInitializing||!_appActive)return;_cameraInitializing=true;final old=_camera;_camera=null;_ready=false;await old?.dispose();

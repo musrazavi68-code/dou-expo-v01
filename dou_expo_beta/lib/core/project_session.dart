@@ -61,6 +61,7 @@ class ProjectSession extends ChangeNotifier {
   bool _saving = false;
   int _revision = 0;
   Future<void>? _saveFuture;
+  int _openToken = 0;
 
   ProjectDocument get document => _history.current;
   bool get isDirty => _dirty;
@@ -106,7 +107,9 @@ class ProjectSession extends ChangeNotifier {
   Future<void> save() {
     final active = _saveFuture;
     if (active != null) return active;
-    final operation = _saveUntilClean();
+    // Defer execution one microtask so _saveFuture is installed before
+    // notifyListeners can re-enter save() through an observer.
+    final operation = Future<void>.microtask(_saveUntilClean);
     _saveFuture = operation;
     return operation.whenComplete(() {
       if (identical(_saveFuture, operation)) _saveFuture = null;
@@ -137,10 +140,12 @@ class ProjectSession extends ChangeNotifier {
   /// A slow read must not overwrite edits made while it was in flight.
   Future<bool> open(String id) async {
     if (id == document.id) return true;
+    final openToken = ++_openToken;
     if (_dirty || _saving) await save();
     final revisionAtStart = _revision;
     final loaded = await _restore(id);
     if (loaded == null) return false;
+    if (openToken != _openToken) return false;
     if (loaded.id != id) {
       throw FormatException('Restored project identifier does not match the requested id');
     }

@@ -12,7 +12,7 @@ The Flutter implementation lives in `dou_expo_beta/`; the existing React Native 
 - Camera and photo-library usage descriptions are applied by `tool/configure_permissions.py` after platform generation.
 
 ## Build locally
-Requires Flutter stable with Dart SDK >= 3.12.0, Android API 24+ and Java 17; iOS builds require Xcode and iOS 13+.
+Requires Flutter 3.50.1 (Dart 3.14), Android API 24+ and Java 21 for CI; iOS builds require Xcode and iOS 13+.
 
 ```bash
 cd dou_expo_beta
@@ -34,7 +34,7 @@ dart run flutter_launcher_icons
 The icon source image has not yet been supplied in this repository, so icon generation is intentionally not run by CI.
 
 ## Export resolution note
-The PNG is a real pixel render of the displayed editor canvas. High-resolution mode uses a 3x render scale (1.5x in standard mode); it is not yet a source-sensor-resolution, full-original-pixel compositor.
+The PNG is a real pixel render of the displayed editor canvas. High-resolution mode uses a 3x render scale (1.5x in standard mode); it is not yet a source-sensor-resolution, full-original-pixel compositor. The camera preview is a live view; the exported image is the composed canvas, not the raw camera sensor stream.
 
 ## Automated build
-GitHub Actions runs dependency resolution, static analysis, tests, release APK compilation, and publishes both the APK and source ZIP as workflow artifacts.
+GitHub Actions pins Flutter 3.50.1, runs strict static analysis and tests, builds the Android release APK, validates an unsigned iOS release build on macOS, checks output files, and publishes the APK and source ZIP as artifacts.

@@ -37,13 +37,12 @@ class ProjectSession extends ChangeNotifier {
     required ProjectDocument initial,
     required Future<void> Function(ProjectDocument) persist,
     required Future<ProjectDocument?> Function(String) restore,
-    required Future<String> Function(String, String, List<int>) writeAsset,
+    required Future<String> Function(String, String, List<int>) this._writeAsset,
     int historyCapacity = 80,
   }) => ProjectSession._(
         initial: initial,
         persist: persist,
         restore: restore,
-        writeAsset: writeAsset,
         historyCapacity: historyCapacity,
       );
 

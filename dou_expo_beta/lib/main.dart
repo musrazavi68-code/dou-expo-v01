@@ -24,6 +24,36 @@ class DouExpoApp extends StatelessWidget {
    colorScheme:const ColorScheme.dark(primary:Color(0xFFFACC15)),useMaterial3:true),
   home:const DouExpoShell());
 }
+
+class DouExpoShell extends StatefulWidget {
+ const DouExpoShell({super.key});
+ @override State<DouExpoShell> createState()=>_DouExpoShellState();
+}
+class _DouExpoShellState extends State<DouExpoShell> {
+ int _index=0;
+ @override Widget build(BuildContext context) {
+  final pages=<Widget>[
+   const OrdinaryCameraScreen(),
+   const DouExpoEditor(),
+   const DarkroomScreen(),
+  ];
+  return Scaffold(
+   body:IndexedStack(index:_index,children:pages),
+   bottomNavigationBar:NavigationBar(
+    backgroundColor:const Color(0xFF100D0C),
+    indicatorColor:const Color(0xFFFACC15).withOpacity(.18),
+    selectedIndex:_index,
+    onDestinationSelected:(v)=>setState(()=>_index=v),
+    destinations:const [
+     NavigationDestination(icon:Icon(Icons.camera_alt_outlined),selectedIcon:Icon(Icons.camera_alt),label:'ORDINARY'),
+     NavigationDestination(icon:Icon(Icons.layers_outlined),selectedIcon:Icon(Icons.layers),label:'DOUBLE'),
+     NavigationDestination(icon:Icon(Icons.tune),selectedIcon:Icon(Icons.tune),label:'DARKROOM'),
+    ],
+   ),
+  );
+ }
+}
+
 class DouExpoEditor extends StatefulWidget {
  const DouExpoEditor({super.key});
  @override State<DouExpoEditor> createState()=>_DouExpoEditorState();

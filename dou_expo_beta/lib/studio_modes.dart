@@ -194,6 +194,9 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
      final data=await output.toByteData(format:ui.ImageByteFormat.png);
      if(data==null)throw StateError('Could not encode developed photo');
      final bytes=data.buffer.asUint8List(data.offsetInBytes,data.lengthInBytes);
+     final current=widget.session.document;
+     widget.session.replace(current.copyWith(canvas:{...current.canvas,'lastEditedIn':'darkroom',
+      'darkroom':{'brightness':_brightness,'contrast':_contrast,'saturation':_saturation}}));
      await Gal.putImageBytes(bytes,name:'darkroom_'+DateTime.now().millisecondsSinceEpoch.toString()+'.png',album:'Dou Expo');
      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Developed PNG saved to Gallery')));
     }finally{output.dispose();}

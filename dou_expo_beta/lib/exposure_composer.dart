@@ -49,12 +49,15 @@ class StencilLibrary {
     }
   }
 
-  static Future<Color> complementaryColor(ui.Image image) async {
+  static Future<Color> complementaryColor(ui.Image image, {StencilKind stencil = StencilKind.none}) async {
     final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (data == null) return const Color(0xFFFF8A00);
     var r = 0.0, g = 0.0, b = 0.0, count = 0;
     final step = math.max(1, (image.width * image.height ~/ 12000));
+    final mask = stencil == StencilKind.none ? null : pathFor(stencil, Size(image.width.toDouble(), image.height.toDouble()));
     for (var i = 0; i < image.width * image.height; i += step) {
+      final x = i % image.width, y = i ~/ image.width;
+      if (mask != null && !mask.contains(Offset(x.toDouble(), y.toDouble()))) continue;
       final o = i * 4;
       if (data.getUint8(o + 3) < 24) continue;
       r += data.getUint8(o); g += data.getUint8(o + 1); b += data.getUint8(o + 2); count++;
@@ -62,7 +65,8 @@ class StencilLibrary {
     if (count == 0) return const Color(0xFFFF8A00);
     final average = Color.fromARGB(255, (r/count).round(), (g/count).round(), (b/count).round());
     final hsl = HSLColor.fromColor(average);
-    return hsl.withHue((hsl.hue + 180) % 360).withSaturation(math.max(.45,hsl.saturation)).withLightness(.58).toColor();
+    final targetHue = hsl.hue >= 70 && hsl.hue <= 160 ? 32.0 : (hsl.hue + 180) % 360;
+    return hsl.withHue(targetHue).withSaturation(math.max(.45,hsl.saturation)).withLightness(.58).toColor();
   }
 }
 
@@ -207,7 +211,7 @@ class ExposureComposer {
             ..filterQuality = FilterQuality.high
             ..blendMode = BlendMode.srcOver
             ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
-            ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
+            ..colorFilter = ColorFilter.matrix(overlayColorMatrix),
         );
         canvas.saveLayer(Offset.zero & size, Paint()..blendMode = BlendMode.dstIn);
         final maskPaint = Paint()

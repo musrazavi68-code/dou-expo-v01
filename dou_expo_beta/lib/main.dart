@@ -87,8 +87,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final b=_base;if(b==null)throw StateError('Choose first photo');
   final r=ratio==0?b.width/b.height:ratio;
   final side=maxSide==0?math.max(b.width,b.height):maxSide;
-  final w=r>=1?side:math.max(1,(side*r).round());
-  final h=r>=1?math.max(1,(side/r).round()):side;
+  final w=(r>=1?side:math.max(1,(side*r).round())).toInt();
+  final h=(r>=1?math.max(1,(side/r).round()):side).toInt();
   return ExposureComposer.renderPng(base:b,overlay:_overlay,width:w,height:h,
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
    overlayOffset:_offset,overlayScale:_scale);
@@ -146,7 +146,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   return Column(children:[Expanded(child:Padding(padding:const EdgeInsets.all(12),
    child:ClipRRect(borderRadius:BorderRadius.circular(18),child:GestureDetector(
     onDoubleTap:_reset,onScaleUpdate:(d){if(_overlay==null)return;setState((){
-     _scale=(_scale*d.scale).clamp(.2,5);_offset+=Offset(d.focalPointDelta.dx/400,d.focalPointDelta.dy/600);
+     _scale=(_scale*d.scale).clamp(.2,5).toDouble();_offset+=Offset(d.focalPointDelta.dx/400,d.focalPointDelta.dy/600);
     });},
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
@@ -191,10 +191,9 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      TextButton(onPressed:(){setState((){_overlay?.dispose();_overlay=null;});},child:const Text('REMOVE 2ND'))])
    ]else const Padding(padding:EdgeInsets.all(10),child:Text('PATTERN / 2ND PHOTO adds the second exposure image',
     style:TextStyle(fontSize:10,color:Colors.white54))),
-   Row(children:[Expanded(child:OutlinedButton.icon(onPressed:bNull(),icon:const Icon(Icons.file_download),
+   Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_base==null?null:_export,icon:const Icon(Icons.file_download),
     label:const Text('EXPORT · RATIO · SIZE'))),const SizedBox(width:8),
     FilledButton(onPressed:_share,child:_busy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.share))]),
    if(_busy)const LinearProgressIndicator()
   ]));
- bool bNull()=>_base==null;
 }

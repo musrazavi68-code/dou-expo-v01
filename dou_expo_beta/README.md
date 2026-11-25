@@ -1,6 +1,10 @@
-# Dou Expo Beta 0.2.0 — Flutter
+# Dou Expo Beta 0.2.2 — Flutter
 
 The Flutter implementation lives in `dou_expo_beta/`; the existing React Native app in `beta-app/` is preserved.
+
+## v0.2.2
+- Android release APK is zip-aligned, signed, signature-verified and checked for package ID, version code, minimum SDK and ARM64 native library before upload.
+- Version code incremented to 3 to avoid downgrade rejection on devices with an earlier beta build.
 
 ## v0.2.0
 - Live camera preview using the Flutter `camera` plugin, photo capture, and front/rear lens switching when available.

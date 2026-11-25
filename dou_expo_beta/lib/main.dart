@@ -10,6 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'exposure_composer.dart';
+import 'studio_modes.dart';
 
 void main() {
  WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +22,7 @@ class DouExpoApp extends StatelessWidget {
   title:'Dou Expo',debugShowCheckedModeBanner:false,
   theme:ThemeData(brightness:Brightness.dark,scaffoldBackgroundColor:const Color(0xFF09090B),
    colorScheme:const ColorScheme.dark(primary:Color(0xFFFACC15)),useMaterial3:true),
-  home:const DouExpoEditor());
+  home:const DouExpoShell());
 }
 class DouExpoEditor extends StatefulWidget {
  const DouExpoEditor({super.key});

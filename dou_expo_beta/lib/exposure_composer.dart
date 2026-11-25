@@ -9,6 +9,7 @@ enum OverlayMaskMode { fullFrame, insidePortrait, outsidePortrait }
 
 enum StencilKind { none, tree, lotus, cypress, arch, wingedBull }
 enum StencilFillMode { photo, pureWhite, tinted }
+enum FilmEffect { none, grain, scanlines }
 
 class StencilLibrary {
   static Path pathFor(StencilKind kind, Size size) {
@@ -112,6 +113,19 @@ class ExposureComposer {
     ];
   }
 
+  static List<double> toneMatrix(double ev, double contrast, double saturation) {
+    final gain = math.pow(2.0, ev).toDouble();
+    final c = contrast.clamp(0.0, 2.0) * gain;
+    final s = saturation.clamp(0.0, 2.0);
+    final offset = 128.0 * (1 - contrast.clamp(0.0, 2.0));
+    return <double>[
+      (0.213 + 0.787*s)*c, (0.715 - 0.715*s)*c, (0.072 - 0.072*s)*c, 0, offset,
+      (0.213 - 0.213*s)*c, (0.715 + 0.285*s)*c, (0.072 - 0.072*s)*c, 0, offset,
+      (0.213 - 0.213*s)*c, (0.715 - 0.715*s)*c, (0.072 + 0.928*s)*c, 0, offset,
+      0, 0, 0, 1, 0,
+    ];
+  }
+
   static Rect coverRect(ui.Image image, Size size) {
     final scale = (size.width / image.width).clamp(
       size.height / image.height,
@@ -139,6 +153,10 @@ class ExposureComposer {
     StencilKind stencil = StencilKind.none,
     StencilFillMode stencilFillMode = StencilFillMode.photo,
     Color stencilTint = const Color(0xFFFF8A00),
+    double contrast = 1,
+    double saturation = 1,
+    FilmEffect filmEffect = FilmEffect.none,
+    double effectAmount = 0,
   }) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -148,7 +166,7 @@ class ExposureComposer {
       coverRect(base, size),
       Paint()
         ..filterQuality = FilterQuality.high
-        ..colorFilter = ColorFilter.matrix(exposureMatrix(baseEv)),
+        ..colorFilter = ColorFilter.matrix(toneMatrix(baseEv, contrast, saturation)),
     );
 
     if (overlay != null) {
@@ -167,7 +185,7 @@ class ExposureComposer {
       }
       final overlayColorMatrix = stencil != StencilKind.none && stencilFillMode != StencilFillMode.photo
           ? <double>[0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.red.toDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.green.toDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.blue.toDouble(), 0,0,0,1,0]
-          : exposureMatrix(overlayEv);
+          : toneMatrix(overlayEv, contrast, saturation);
       if (maskMode == OverlayMaskMode.fullFrame && maskStrokes.isEmpty) {
         canvas.drawImageRect(
           overlay,
@@ -243,6 +261,27 @@ class ExposureComposer {
       }
       if (stencil != StencilKind.none) canvas.restore();
     }
+    if (filmEffect == FilmEffect.scanlines && effectAmount > 0) {
+      final spacing = math.max(2.0, size.width / 240);
+      final lineHeight = math.max(1.0, size.width / 1800);
+      final paint = Paint()..color = Color.fromRGBO(0, 0, 0, .22 * effectAmount);
+      for (var y = 0.0; y < size.height; y += spacing) {
+        canvas.drawRect(Rect.fromLTWH(0, y, size.width, lineHeight), paint);
+      }
+    } else if (filmEffect == FilmEffect.grain && effectAmount > 0) {
+      final random = math.Random(31);
+      final count = (size.width * size.height / 850 * effectAmount).round();
+      final paint = Paint();
+      for (var i = 0; i < count; i++) {
+        paint.color = random.nextBool()
+            ? Color.fromRGBO(255, 255, 255, .18 * effectAmount)
+            : Color.fromRGBO(0, 0, 0, .2 * effectAmount);
+        canvas.drawRect(
+          Rect.fromLTWH(random.nextDouble()*size.width, random.nextDouble()*size.height, 1, 1),
+          paint,
+        );
+      }
+    }
     canvas.restore();
   }
 
@@ -263,6 +302,10 @@ class ExposureComposer {
     StencilKind stencil = StencilKind.none,
     StencilFillMode stencilFillMode = StencilFillMode.photo,
     Color stencilTint = const Color(0xFFFF8A00),
+    double contrast = 1,
+    double saturation = 1,
+    FilmEffect filmEffect = FilmEffect.none,
+    double effectAmount = 0,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -283,6 +326,10 @@ class ExposureComposer {
       stencil: stencil,
       stencilFillMode: stencilFillMode,
       stencilTint: stencilTint,
+      contrast: contrast,
+      saturation: saturation,
+      filmEffect: filmEffect,
+      effectAmount: effectAmount,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
@@ -313,6 +360,10 @@ class ExposurePreviewPainter extends CustomPainter {
     this.stencil = StencilKind.none,
     this.stencilFillMode = StencilFillMode.photo,
     this.stencilTint = const Color(0xFFFF8A00),
+    this.contrast = 1,
+    this.saturation = 1,
+    this.filmEffect = FilmEffect.none,
+    this.effectAmount = 0,
   });
 
   final ui.Image? base;
@@ -329,6 +380,10 @@ class ExposurePreviewPainter extends CustomPainter {
   final StencilKind stencil;
   final StencilFillMode stencilFillMode;
   final Color stencilTint;
+  final double contrast;
+  final double saturation;
+  final FilmEffect filmEffect;
+  final double effectAmount;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -352,6 +407,10 @@ class ExposurePreviewPainter extends CustomPainter {
       stencil: stencil,
       stencilFillMode: stencilFillMode,
       stencilTint: stencilTint,
+      contrast: contrast,
+      saturation: saturation,
+      filmEffect: filmEffect,
+      effectAmount: effectAmount,
     );
   }
 
@@ -370,5 +429,9 @@ class ExposurePreviewPainter extends CustomPainter {
       old.maskStrokes != maskStrokes ||
       old.stencil != stencil ||
       old.stencilFillMode != stencilFillMode ||
-      old.stencilTint != stencilTint;
+      old.stencilTint != stencilTint ||
+      old.contrast != contrast ||
+      old.saturation != saturation ||
+      old.filmEffect != filmEffect ||
+      old.effectAmount != effectAmount;
 }

@@ -60,7 +60,7 @@ void main() {
     autosave.dispose();
   });
 
-  test('failed save is reported and remains dirty for a later retry', () async {
+  test('failed explicit flush propagates and remains dirty for a later retry', () async {
     var attempts = 0;
     Object? reported;
     final session = ProjectSession.withBackend(
@@ -80,8 +80,8 @@ void main() {
 
     session.replace(_document('Changed'));
     autosave.markChanged();
-    await autosave.flush();
-    expect(reported, isA<StateError>());
+    await expectLater(autosave.flush(), throwsA(isA<StateError>()));
+    expect(reported, isNull);
     expect(session.isDirty, isTrue);
 
     await autosave.flush();

@@ -226,33 +226,32 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   return Column(children:[Expanded(child:Padding(padding:const EdgeInsets.all(12),
    child:ClipRRect(borderRadius:BorderRadius.circular(18),child:GestureDetector(
     onDoubleTap:_reset,
-    onPanStart:_maskEdit&&_overlay!=null?(d){
-      final box=_previewKey.currentContext?.findRenderObject() as RenderBox?;
-      if(box==null||box.size.isEmpty)return;
-      final point=box.globalToLocal(d.globalPosition);
-      final normalized=Offset((point.dx/box.size.width).clamp(0.0,1.0),(point.dy/box.size.height).clamp(0.0,1.0));
-      setState((){
-       _activeMaskPath=Path()..moveTo(normalized.dx,normalized.dy);
-       _maskStrokes.add(MaskStroke(path:_activeMaskPath!,width:_brushSize,erase:_eraseBrush));
-      });
-    }:null,
-    onPanUpdate:_maskEdit&&_overlay!=null?(d){
-      final box=_previewKey.currentContext?.findRenderObject() as RenderBox?;
-      if(box==null||box.size.isEmpty)return;
-      final point=box.globalToLocal(d.globalPosition);
-      final normalized=Offset((point.dx/box.size.width).clamp(0.0,1.0),(point.dy/box.size.height).clamp(0.0,1.0));
-      setState(()=>_activeMaskPath?.lineTo(normalized.dx,normalized.dy));
-    }:null,
-    onPanEnd:_maskEdit?(_){_activeMaskPath=null;}:null,
-    onScaleUpdate:(d){
-     if(_overlay==null||_maskEdit)return;
+    onScaleStart:(d){
+     if(!_maskEdit||_overlay==null)return;
      final box=_previewKey.currentContext?.findRenderObject() as RenderBox?;
      if(box==null||box.size.isEmpty)return;
+     final point=box.globalToLocal(d.focalPoint);
+     final normalized=Offset((point.dx/box.size.width).clamp(0.0,1.0),(point.dy/box.size.height).clamp(0.0,1.0));
      setState((){
-      _scale=(_scale*d.scale).clamp(.2,5).toDouble();
-      _offset+=Offset(d.focalPointDelta.dx/box.size.width,d.focalPointDelta.dy/box.size.height);
+      _activeMaskPath=Path()..moveTo(normalized.dx,normalized.dy);
+      _maskStrokes.add(MaskStroke(path:_activeMaskPath!,width:_brushSize,erase:_eraseBrush));
      });
     },
+    onScaleUpdate:(d){
+     final box=_previewKey.currentContext?.findRenderObject() as RenderBox?;
+     if(box==null||box.size.isEmpty)return;
+     if(_maskEdit&&_overlay!=null){
+      final point=box.globalToLocal(d.focalPoint);
+      final normalized=Offset((point.dx/box.size.width).clamp(0.0,1.0),(point.dy/box.size.height).clamp(0.0,1.0));
+      setState(()=>_activeMaskPath?.lineTo(normalized.dx,normalized.dy));
+     }else if(_overlay!=null){
+      setState((){
+       _scale=(_scale*d.scale).clamp(.2,5).toDouble();
+       _offset+=Offset(d.focalPointDelta.dx/box.size.width,d.focalPointDelta.dy/box.size.height);
+      });
+     }
+    },
+    onScaleEnd:(d){_activeMaskPath=null;},
     child:CustomPaint(key:_previewKey,size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
      overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint,contrast:_contrast,saturation:_saturation,filmEffect:_filmEffect,effectAmount:_effectAmount),

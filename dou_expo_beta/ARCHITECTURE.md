@@ -62,7 +62,8 @@ dou_expo_beta/
 - StudioShell creates exactly one ProjectSession and injects it into Ordinary Camera, Double Exposure and Darkroom. Switching tabs must not recreate or discard the session.
 - A project is the canonical state: canvas/export profile, ordered layers, stable asset references, visibility/opacity/blend/transform/exposure, masks, stencil configuration, film recipe, and Darkroom adjustments.
 - Source image bytes are copied into app-private project assets before a manifest references them. Temporary picker/camera paths must never be persisted.
-- Features submit immutable project changes through session commands. The session records one semantic history entry per completed user action, not per slider frame or pointer-move event.
+- Features submit immutable project changes through ProjectSession.edit/replace. The session records one semantic history entry per completed user action, not per slider frame or pointer-move event.
+- AutosaveCoordinator observes ProjectSession revision changes directly, debounces writes, and exposes an explicit flush that propagates failures to the lifecycle owner. Background failures are reported through its error callback.
 - Preview and export use the same renderer/settings. Preview may be lower resolution; export must be deterministic at requested dimensions.
 - UI owns transient state only (open sheet, active gesture, camera controller, countdown). Camera resources are disposed/recreated on lifecycle changes; project content is not.
 - Autosave is debounced while editing, serialized/coalesced during writes, and flushed when the app becomes inactive/paused. A failed save leaves the session dirty and reports the error.
@@ -83,7 +84,7 @@ dou_expo_beta/
 
 ### Phase A — Stabilize the core (no UI migration yet)
 - Deep immutable project snapshots and strict model validation.
-- Serialized/coalesced save, revision-safe open, safe atomic asset/manifest IO.
+- Serialized/coalesced save, revision-safe and latest-request-wins project open, safe atomic asset/manifest IO with backup recovery.
 - Unit tests for immutability, interrupted writes, concurrent edits/saves and asset validation.
 
 ### Phase B — Define the complete project schema

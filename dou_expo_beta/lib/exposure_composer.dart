@@ -69,14 +69,14 @@ class StencilLibrary {
         p.cubicTo(w*.65,h*.34,w*.98,h*.48,w*.78,h*.82); p.cubicTo(w*.7,h*.94,w*.6,h*.98,w*.5,h*.96); p.close(); return p;
       case StencilKind.hand:
         p.moveTo(w*.3,h*.94); p.lineTo(w*.3,h*.48);
-        for (var j=0;j<4;j++) { final x=w*(.22+j*.15); p.lineTo(x,h*.48); p.lineTo(x,h*(.12+(j%2)*.04)); p.quadraticBezierTo(x,h*.04,x+w*.07,h*.1); p.lineTo(x+w*.07,h*.52); }
+        for (var handIndex=0;handIndex<4;handIndex++) { final x=w*(.22+handIndex*.15); p.lineTo(x,h*.48); p.lineTo(x,h*(.12+(j%2)*.04)); p.quadraticBezierTo(x,h*.04,x+w*.07,h*.1); p.lineTo(x+w*.07,h*.52); }
         p.lineTo(w*.82,h*.62); p.quadraticBezierTo(w*.95,h*.64,w*.88,h*.76); p.lineTo(w*.7,h*.94); p.close(); return p;
       case StencilKind.brokenChain:
         p.addOval(Rect.fromLTWH(w*.08,h*.18,w*.48,h*.34));
         p.addOval(Rect.fromLTWH(w*.44,h*.5,w*.48,h*.34));
         return p;
       case StencilKind.people:
-        for (var j=0;j<5;j++) { final x=w*(.12+j*.17); p.addOval(Rect.fromCircle(center:Offset(x+w*.055,h*.22),radius:w*.055)); p.addRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x,h*.31,w*.11,h*.52),Radius.circular(w*.035))); }
+        for (var peopleIndex=0;peopleIndex<5;peopleIndex++) { final x=w*(.12+peopleIndex*.17); p.addOval(Rect.fromCircle(center:Offset(x+w*.055,h*.22),radius:w*.055)); p.addRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x,h*.31,w*.11,h*.52),Radius.circular(w*.035))); }
         return p;
       case StencilKind.skyline:
         p.moveTo(0,h*.9); p.lineTo(0,h*.48); p.lineTo(w*.14,h*.48); p.lineTo(w*.2,h*.22);
@@ -100,8 +100,8 @@ class StencilLibrary {
         p.cubicTo(w*.08,h*.85,w*.05,h*.25,w*.5,h*.2); p.close(); return p;
       case StencilKind.laurel:
       case StencilKind.wreath:
-        p.addOval(Rect.fromLTWH(w*.16,h*.12,w*.68,h*.78),PathFillType.evenOdd);
-        for(var j=0;j<9;j++){final y=h*(.2+j*.075); p.addOval(Rect.fromLTWH(w*(j%2==0?.16:.68),y,w*.16,h*.065));}
+        p.addOval(Rect.fromLTWH(w*.16,h*.12,w*.68,h*.78), pathFillType: PathFillType.evenOdd);
+        for(var wreathIndex=0;wreathIndex<9;wreathIndex++){final y=h*(.2+wreathIndex*.075); p.addOval(Rect.fromLTWH(w*(wreathIndex%2==0?.16:.68),y,w*.16,h*.065));}
         return p;
       case StencilKind.persianGuard:
         p.moveTo(w*.5,h*.04); p.lineTo(w*.68,h*.12); p.lineTo(w*.72,h*.3);

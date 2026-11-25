@@ -1,6 +1,6 @@
 {
   "name": "dou-expo-v2",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -30,10 +30,6 @@
     "@types/react": "~19.1.10",
     "typescript": "~5.9.2"
   },
-  "engines": {
-    "node": ">=20.19.4"
-  },
-  "overrides": {
-    "expo-font": "$expo-font"
-  }
+  "engines": {"node": ">=20.19.4"},
+  "overrides": {"expo-font": "$expo-font"}
 }

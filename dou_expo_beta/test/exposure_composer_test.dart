@@ -60,12 +60,12 @@ void main() {
       final inside = await render(OverlayMaskMode.insidePortrait);
       final outside = await render(OverlayMaskMode.outsidePortrait);
       final insideCenter = await _pixel(Uint8List.fromList(inside), 20, 10, 5);
-      final insideCorner = await _pixel(Uint8ListLike(inside), 20, 0, 0);
+      final insideCorner = await _pixel(Uint8List.fromList(inside), 20, 0, 0);
       final outsideCenter = await _pixel(Uint8List.fromList(outside), 20, 10, 5);
-      final outsideCorner = await _pixel(Uint8ListLike(outside), 20, 0, 0);
+      final outsideCorner = await _pixel(Uint8List.fromList(outside), 20, 0, 0);
 
-      expect(insideCenter.blue, greaterThan(insideCenter.red));
-      expect(insideCorner.red, greaterThan(insideCorner.blue));
+      expect(insideCenter.b, greaterThan(insideCenter.red));
+      expect(insideCorner.r, greaterThan(insideCorner.blue));
       expect(outsideCenter.red, greaterThan(outsideCenter.blue));
       expect(outsideCorner.blue, greaterThan(outsideCorner.red));
     } finally {

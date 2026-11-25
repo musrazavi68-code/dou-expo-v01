@@ -181,7 +181,7 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
       HapticFeedback.mediumImpact();
       final shot = await controller.takePicture();
       if (!mounted) return;
-      setState(() { _photo = File(shot.path); _postStage = false; _useLiveCamera = false; _cameraReady = false; });
+      setState(() { _photo = File(shot.path); _postStage = true; _useLiveCamera = false; _cameraReady = false; });
       _cameraController = null;
       await controller.dispose();
     } on CameraException catch (e) { _message('Capture failed: ${e.description ?? e.code}'); }
@@ -309,11 +309,18 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
   Widget _buildBaseLayer() {
     final c=_cameraController;
     if (_useLiveCamera && _cameraReady && c!=null && c.value.isInitialized) {
-      final size=c.value.previewSize;
-      return ClipRect(child:Transform.scale(
-        scale: size==null?1:(1/ (size.width/size.height)),
-        child:Center(child:CameraPreview(c)),
-      ));
+      final size = c.value.previewSize;
+      if (size == null) return CameraPreview(c);
+      return ClipRect(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: size.height,
+            height: size.width,
+            child: CameraPreview(c),
+          ),
+        ),
+      );
     }
     if (_photo!=null) return Image.file(_photo!,fit:BoxFit.cover);
     return Container(color:const Color(0xFF111116),child:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[

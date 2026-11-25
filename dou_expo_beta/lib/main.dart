@@ -33,9 +33,10 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  List<CameraDescription> _cameras=[];
  ui.Image? _base,_overlay;
  bool _cameraOpen=false,_cameraReady=false,_busy=false;
- double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1,_scaleStart=1;
+ double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1;
  Offset _offset=Offset.zero;
  int _blend=0,_cameraIndex=0;
+ OverlayMaskMode _maskMode=OverlayMaskMode.fullFrame;
  static const _modes=< (String,BlendMode) >[
   ('BRIGHT / SCREEN',BlendMode.screen),('LIGHTEN',BlendMode.lighten),('ADD',BlendMode.plus),
   ('OVERLAY',BlendMode.overlay),('SOFT LIGHT',BlendMode.softLight),('MULTIPLY',BlendMode.multiply),
@@ -92,7 +93,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final h=(r>=1?math.max(1,(side/r).round()):side).toInt();
   return ExposureComposer.renderPng(base:b,overlay:_overlay,width:w,height:h,
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-   overlayOffset:_offset,overlayScale:_scale);
+   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode);
  }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
@@ -132,7 +133,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     trailing:_blend==i?const Icon(Icons.check,color:Color(0xFFFACC15)):null,
     onTap:(){setState(()=>_blend=i);Navigator.pop(ctx);})
   ])));}
- void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_scale=1;_offset=Offset.zero;_blend=0;});}
+ void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;});}
  @override Widget build(BuildContext context)=>Scaffold(
   appBar:AppBar(title:const Text('DOU EXPO',style:TextStyle(letterSpacing:2,fontWeight:FontWeight.bold)),
    actions:[IconButton(tooltip:'Export dimensions',onPressed:_export,icon:const Icon(Icons.ios_share)),
@@ -151,7 +152,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     });},
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-     overlayOffset:_offset,overlayScale:_scale),
+     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode),
      child:_cameraOpen && _cameraReady && _camera!=null
       ? CameraPreview(_camera!)
       :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -187,6 +188,21 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     _slider('MIX / OPACITY',_mix,(v)=>setState(()=>_mix=v)),
     _slider('BASE EXPOSURE',(_baseEv+2)/4,(v)=>setState(()=>_baseEv=v*4-2),text:_baseEv.toStringAsFixed(1)+' EV'),
     _slider('SECOND EXPOSURE',(_overlayEv+2)/4,(v)=>setState(()=>_overlayEv=v*4-2),text:_overlayEv.toStringAsFixed(1)+' EV'),
+    Row(children:[
+     const SizedBox(width:105,child:Text('2ND IMAGE MASK',style:TextStyle(fontSize:9,color:Colors.white60))),
+     Expanded(child:Wrap(spacing:4,children:[
+      ChoiceChip(label:const Text('FULL'),selected:_maskMode==OverlayMaskMode.fullFrame,
+       onSelected:(_)=>setState(()=>_maskMode=OverlayMaskMode.fullFrame)),
+      ChoiceChip(label:const Text('INSIDE'),selected:_maskMode==OverlayMaskMode.insidePortrait,
+       onSelected:(_)=>setState(()=>_maskMode=OverlayMaskMode.insidePortrait)),
+      ChoiceChip(label:const Text('OUTSIDE'),selected:_maskMode==OverlayMaskMode.outsidePortrait,
+       onSelected:(_)=>setState(()=>_maskMode=OverlayMaskMode.outsidePortrait)),
+     ]))
+    ]),
+    if(_maskMode!=OverlayMaskMode.fullFrame)
+     const Padding(padding:EdgeInsets.only(bottom:4),child:Text(
+      'Portrait silhouette mask · affects only image two; base photo remains unchanged',
+      style:TextStyle(fontSize:9,color:Colors.white54))),
     Row(children:[Expanded(child:Text('MODE: '+_modes[_blend].$1,style:const TextStyle(fontSize:9,color:Colors.white60))),
      TextButton(onPressed:_reset,child:const Text('RESET')),
      TextButton(onPressed:(){setState((){_overlay?.dispose();_overlay=null;});},child:const Text('REMOVE 2ND'))])

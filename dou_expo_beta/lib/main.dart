@@ -136,8 +136,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
       ChoiceChip(label:const Text('JPEG · 95%'),selected:format=='JPEG',onSelected:(_)=>ss(()=>format='JPEG')),
      ]),
      FilledButton.icon(onPressed:(){final outputSize=unit=='cm'?(cm/2.54*dpi).round():sizes[si].$2;
-      Navigator.pop(ctx);_save(_ratios[ri].$2,outputSize,jpeg:format=='JPEG');},
-      icon:const Icon(Icons.file_download),label:Text('EXPORT $format'))
+      Navigator.pop(ctx);_save(_ratios[ri].$2,outputSize);},
+      icon:const Icon(Icons.file_download),label:const Text('EXPORT PNG'))
     ])))));
  }
  Future<void> _save(double ratio,int size,{bool jpeg=false}) async {

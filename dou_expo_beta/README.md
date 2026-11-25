@@ -12,7 +12,7 @@ The Flutter implementation lives in `dou_expo_beta/`; the existing React Native 
 - Camera and photo-library usage descriptions are applied by `tool/configure_permissions.py` after platform generation.
 
 ## Build locally
-Requires Flutter stable with Dart SDK >= 3.12.0, Android SDK, and (for iOS) Xcode.
+Requires Flutter stable with Dart SDK >= 3.12.0, Android API 24+ and Java 17; iOS builds require Xcode and iOS 13+.
 
 ```bash
 cd dou_expo_beta

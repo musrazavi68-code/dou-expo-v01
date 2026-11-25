@@ -24,7 +24,7 @@ void main() {
       initial: initial,
       persist: (_) async {},
       restore: (_) async => null,
-      writeAsset: (_, _, _) async => 'assets/test.png',
+      writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
     );
 
     session.replace(doc('Edited'));

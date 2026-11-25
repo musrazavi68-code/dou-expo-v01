@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: dou-expo-beta-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   android-release:

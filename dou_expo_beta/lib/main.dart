@@ -66,7 +66,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  Future<void> _capture() async {
   final c=_camera;if(c==null||!c.value.isInitialized){_toast('Camera not ready');return;}
   try{final x=await c.takePicture();final im=await ExposureComposer.decode(await File(x.path).readAsBytes());
-   if(!mounted){im.dispose();return;}setState(()=>_base=im);
+   if(!mounted){im.dispose();return;}setState((){_base?.dispose();_base=im;});
    _camera=null;_cameraOpen=false;_cameraReady=false;await c.dispose();
   }catch(e){_toast('Capture failed: '+e.toString());}
  }

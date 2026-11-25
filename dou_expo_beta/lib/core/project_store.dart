@@ -111,9 +111,24 @@ class ProjectStore {
     if (!await dir.exists()) return null;
     final file = File('${dir.path}/project.json');
     final backup = File('${dir.path}/project.json.bak');
-    final source = await file.exists() ? file : (await backup.exists() ? backup : null);
-    if (source == null) return null;
-    final project = ProjectDocument.decode(await source.readAsString());
+    if (!await file.exists() && !await backup.exists()) return null;
+    ProjectDocument project;
+    if (await file.exists()) {
+      try {
+        project = ProjectDocument.decode(await file.readAsString());
+      } on FormatException {
+        if (!await backup.exists()) rethrow;
+        project = ProjectDocument.decode(await backup.readAsString());
+      } on TypeError {
+        if (!await backup.exists()) rethrow;
+        project = ProjectDocument.decode(await backup.readAsString());
+      } on ArgumentError {
+        if (!await backup.exists()) rethrow;
+        project = ProjectDocument.decode(await backup.readAsString());
+      }
+    } else {
+      project = ProjectDocument.decode(await backup.readAsString());
+    }
     if (project.id != id) {
       throw FormatException('Project manifest identifier does not match its directory');
     }

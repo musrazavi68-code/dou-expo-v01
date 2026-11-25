@@ -32,6 +32,18 @@ Future<ui.Color> _pixel(Uint8List bytes, int width, int x, int y) async {
 }
 
 void main() {
+  test('JPEG codec produces a readable quality-95 image at requested dimensions', () {
+    final source = img.Image(width: 32, height: 24);
+    img.fill(source, color: img.ColorRgb8(210, 90, 35));
+    final encoded = img.encodeJpg(source, quality: 95);
+    expect(encoded.length, greaterThan(0));
+    final decoded = img.decodeJpg(encoded);
+    expect(decoded, isNotNull);
+    expect(decoded!.width, 32);
+    expect(decoded.height, 24);
+  });
+
+
   test('all heritage stencil paths stay inside normalized canvas', () {
     for (final kind in StencilKind.values.where((kind) => kind != StencilKind.none)) {
       final path = StencilLibrary.pathFor(kind, const ui.Size(100, 120));

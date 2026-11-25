@@ -151,6 +151,8 @@ class ExposureComposer {
           }
         }
         for (final stroke in maskStrokes) {
+          canvas.save();
+          canvas.scale(size.width, size.height);
           canvas.drawPath(
             stroke.path,
             Paint()
@@ -166,6 +168,7 @@ class ExposureComposer {
                   ? MaskFilter.blur(BlurStyle.normal, maskFeather)
                   : null,
           );
+          canvas.restore();
         }
         canvas.restore(Paint()..blendMode = BlendMode.dstIn);
         canvas.restore();

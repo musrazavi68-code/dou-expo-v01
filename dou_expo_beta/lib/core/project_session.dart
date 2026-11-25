@@ -4,17 +4,19 @@ import 'history_stack.dart';
 import 'project_document.dart';
 import 'project_store.dart';
 
-/// Shared project state used by camera capture, Double Exposure and Darkroom.
-///
-/// UI layers should publish completed edits through [replace], rather than
-/// keeping independent, unsynchronised copies of project metadata.
+/// Shared project state used by all studio features. UI code publishes
+/// complete immutable snapshots; persistence and history stay centralized.
 class ProjectSession {
   ProjectSession._({
     required ProjectDocument initial,
     required Future<void> Function(ProjectDocument) persist,
     required Future<ProjectDocument?> Function(String) restore,
     required Future<String> Function(String, String, List<int>) writeAsset,
-  })  : _history = HistoryStack<ProjectDocument>(initial: initial),
+    required int historyCapacity,
+  })  : _history = HistoryStack<ProjectDocument>(
+          initial: initial,
+          capacity: historyCapacity,
+        ),
         _persist = persist,
         _restore = restore,
         _writeAsset = writeAsset;
@@ -22,6 +24,7 @@ class ProjectSession {
   factory ProjectSession({
     required ProjectDocument initial,
     ProjectStore? store,
+    int historyCapacity = 80,
   }) {
     final projectStore = store ?? ProjectStore();
     return ProjectSession.withBackend(
@@ -29,6 +32,7 @@ class ProjectSession {
       persist: projectStore.save,
       restore: projectStore.load,
       writeAsset: projectStore.saveAsset,
+      historyCapacity: historyCapacity,
     );
   }
 
@@ -38,11 +42,13 @@ class ProjectSession {
     required Future<void> Function(ProjectDocument) persist,
     required Future<ProjectDocument?> Function(String) restore,
     required Future<String> Function(String, String, List<int>) writeAsset,
+    int historyCapacity = 80,
   }) => ProjectSession._(
         initial: initial,
         persist: persist,
         restore: restore,
         writeAsset: writeAsset,
+        historyCapacity: historyCapacity,
       );
 
   final HistoryStack<ProjectDocument> _history;
@@ -53,18 +59,18 @@ class ProjectSession {
   bool _dirty = false;
   bool _saving = false;
   int _revision = 0;
+  Future<void>? _saveFuture;
 
   ProjectDocument get document => _history.current;
   bool get isDirty => _dirty;
   bool get isSaving => _saving;
   bool get canUndo => _history.canUndo;
   bool get canRedo => _history.canRedo;
+  int get undoCount => _history.undoCount;
+  int get revision => _revision;
 
   /// Atomically publishes a complete immutable document snapshot.
   void replace(ProjectDocument next) {
-    if (_saving && next.id != document.id) {
-      throw StateError('Cannot switch projects while saving');
-    }
     if (next.id != document.id) {
       throw ArgumentError('A session cannot be replaced with another project id');
     }
@@ -90,32 +96,53 @@ class ProjectSession {
     return value;
   }
 
-  /// Writes the asset before its path is referenced by the project manifest.
+  /// Persists the asset before a manifest can refer to its stable path.
   Future<String> addAsset(String fileName, Uint8List bytes) =>
       _writeAsset(document.id, fileName, bytes);
 
-  Future<void> save() async {
-    if (_saving) throw StateError('A project save is already in progress');
+  /// Concurrent save requests join one writer. If edits occur during IO, the
+  /// writer persists the latest revision before completing.
+  Future<void> save() {
+    final active = _saveFuture;
+    if (active != null) return active;
+    final operation = _saveUntilClean();
+    _saveFuture = operation;
+    return operation.whenComplete(() {
+      if (identical(_saveFuture, operation)) _saveFuture = null;
+    });
+  }
+
+  Future<void> _saveUntilClean() async {
     _saving = true;
-    final revisionAtStart = _revision;
-    final snapshot = document;
     try {
-      await _persist(snapshot);
-      // An edit may have happened while disk IO was in progress. In that
-      // case the persisted snapshot is valid, but the newer state stays dirty.
-      if (_revision == revisionAtStart && identical(document, snapshot)) {
-        _dirty = false;
+      // Save once even for a pristine document so a newly-created project can
+      // be explicitly committed. Subsequent passes only happen for new edits.
+      var firstPass = true;
+      while (firstPass || _dirty) {
+        firstPass = false;
+        final revisionAtStart = _revision;
+        final snapshot = document;
+        await _persist(snapshot);
+        if (_revision == revisionAtStart && identical(document, snapshot)) {
+          _dirty = false;
+        }
       }
     } finally {
       _saving = false;
     }
   }
 
-  /// Replaces the current project only after a valid manifest has been read.
+  /// A slow read must not overwrite edits made while it was in flight.
+  /// Dirty state is saved first; if a new edit races the read, opening aborts.
   Future<bool> open(String id) async {
-    if (_saving) throw StateError('Cannot open a project while saving');
+    if (id == document.id) return true;
+    if (_dirty || _saving) await save();
+    final revisionAtStart = _revision;
     final loaded = await _restore(id);
     if (loaded == null) return false;
+    if (_revision != revisionAtStart || _dirty || _saving) {
+      throw StateError('Project changed while another project was loading');
+    }
     _history.reset(loaded);
     _revision++;
     _dirty = false;

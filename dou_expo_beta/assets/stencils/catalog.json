@@ -1,0 +1,18 @@
+{
+  "title":"Dou Expo Persian & Heritage Stencil Bank",
+  "version":1,
+  "items":[
+    {"id":"senmurv","title":"Senmurv / Simurgh","category":"Persian mythology","asset":"assets/stencils/senmurv.svg","license_note":"User-provided visual reference; simplified original vector interpretation."},
+    {"id":"azerbaijan-symbol-atlas","title":"Regional solid-symbol atlas","category":"Heritage symbols","asset":"assets/stencils/heritage_atlas.svg","license_note":"Original simplified vector set inspired by the user-provided icon-sheet reference."},
+    {"id":"tree","title":"Tree silhouette","category":"Nature"},
+    {"id":"cypress","title":"Cypress","category":"Persian nature"},
+    {"id":"lotus","title":"Lotus","category":"Achaemenid ornament"},
+    {"id":"winged-bull","title":"Winged bull","category":"Achaemenid ornament"},
+    {"id":"persian-arch","title":"Persian arch","category":"Architecture"},
+    {"id":"laurel","title":"Laurel wreath","category":"Ornament"},
+    {"id":"pomegranate","title":"Pomegranate","category":"Persian symbols"},
+    {"id":"carpet","title":"Carpet medallion","category":"Textile"}
+  ],
+  "modes":["photo","pure-white","tinted","textured","noise"],
+  "compositing":"Stencil clips the second exposure; it is not a gradient overlay."
+}

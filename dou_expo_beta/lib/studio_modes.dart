@@ -52,7 +52,6 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  double _ev=0,_minEv=-2,_maxEv=2,_zoom=1,_maxZoom=4;
  bool _cameraInitializing=false,_appActive=true;
  String _film='COLOR';
- XFile? _lastShot;
  Uint8List? _lastShotBytes;
  String? _loadedOrdinaryPath;int _restoreToken=0;
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);widget.session.addListener(_onProjectChanged);_restoreOrdinary();_init();}
@@ -67,7 +66,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    if(path!=null&&path!=_loadedOrdinaryPath){final file=await ProjectStore().resolveAsset(project.id,path);bytes=await file.readAsBytes();}
    if(token!=_restoreToken||!mounted)return;
    setState((){
-    if(path==null){_lastShotBytes=null;_lastShot=null;_loadedOrdinaryPath=null;}
+    if(path==null){_lastShotBytes=null;_loadedOrdinaryPath=null;}
     else{
      if(bytes!=null){_lastShotBytes=bytes;_loadedOrdinaryPath=path;_lastShot=null;}
      final film=layer?.settings['film'];if(film is String)_film=film;
@@ -122,7 +121,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
     activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'ordinaryCamera'}));
    await Gal.putImageBytes(developed,name:'ordinary_'+DateTime.now().millisecondsSinceEpoch.toString()+'.jpg',album:'Dou Expo');
    if(mounted){
-    setState(() { _lastShot = XFile(shot.path); _lastShotBytes = developed; });
+    setState(() { _lastShotBytes = developed; });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Saved $_film · one exposure')));
    }
   }catch(e){

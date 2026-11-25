@@ -1,18 +1,62 @@
 import 'dart:convert';
 
-/// Serializable editor state. Image bytes are stored as project assets; this
-/// document contains stable relative asset paths, never temporary picker paths.
+/// Recursively freezes JSON-compatible data so history snapshots cannot be
+/// mutated through nested map/list references after publication.
+Object? _freezeJson(Object? value) {
+  if (value == null || value is String || value is bool || value is int) {
+    return value;
+  }
+  if (value is double) {
+    if (!value.isFinite) throw ArgumentError('Project data cannot contain NaN or infinity');
+    return value;
+  }
+  if (value is Map) {
+    final frozen = <String, Object?>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String) {
+        throw ArgumentError('Project JSON map keys must be strings');
+      }
+      frozen[entry.key as String] = _freezeJson(entry.value);
+    }
+    return Map<String, Object?>.unmodifiable(frozen);
+  }
+  if (value is List) {
+    return List<Object?>.unmodifiable(value.map(_freezeJson));
+  }
+  throw ArgumentError('Unsupported project data type: ${value.runtimeType}');
+}
+
+Map<String, Object?> _freezeMap(Map<String, Object?> value) =>
+    _freezeJson(value) as Map<String, Object?>;
+
+/// Serializable immutable editor state. Image bytes are stored as project
+/// assets; this document contains stable relative asset paths, never picker
+/// or camera temporary paths.
 class ProjectDocument {
-  const ProjectDocument({
+  ProjectDocument({
     required this.id,
     required this.name,
     required this.createdAt,
     required this.updatedAt,
-    required this.canvas,
-    required this.layers,
+    required Map<String, Object?> canvas,
+    required List<LayerDocument> layers,
     this.activeLayerId,
     this.schemaVersion = 1,
-  });
+  })  : canvas = _freezeMap(canvas),
+        layers = List<LayerDocument>.unmodifiable(layers) {
+    if (id.isEmpty) throw ArgumentError.value(id, 'id', 'Project id cannot be empty');
+    if (name.trim().isEmpty) throw ArgumentError.value(name, 'name', 'Project name cannot be empty');
+    if (schemaVersion != 1) {
+      throw FormatException('Unsupported project schema: $schemaVersion');
+    }
+    final ids = this.layers.map((layer) => layer.id).toSet();
+    if (ids.length != this.layers.length) {
+      throw ArgumentError('Layer identifiers must be unique within a project');
+    }
+    if (activeLayerId != null && !ids.contains(activeLayerId)) {
+      throw ArgumentError.value(activeLayerId, 'activeLayerId', 'Active layer does not exist');
+    }
+  }
 
   final int schemaVersion;
   final String id;
@@ -56,7 +100,7 @@ class ProjectDocument {
 }
 
 class LayerDocument {
-  const LayerDocument({
+  LayerDocument({
     required this.id,
     required this.name,
     required this.assetPath,
@@ -67,9 +111,23 @@ class LayerDocument {
     this.offsetY = 0,
     this.scale = 1,
     this.exposure = 0,
-    this.maskStrokes = const [],
-    this.settings = const {},
-  });
+    List<Map<String, Object?>> maskStrokes = const [],
+    Map<String, Object?> settings = const {},
+  })  : maskStrokes = List<Map<String, Object?>>.unmodifiable(
+          maskStrokes.map(_freezeMap),
+        ),
+        settings = _freezeMap(settings) {
+    if (id.isEmpty) throw ArgumentError.value(id, 'id', 'Layer id cannot be empty');
+    if (!opacity.isFinite || opacity < 0 || opacity > 1) {
+      throw ArgumentError.value(opacity, 'opacity', 'Opacity must be between 0 and 1');
+    }
+    if (!scale.isFinite || scale <= 0) {
+      throw ArgumentError.value(scale, 'scale', 'Scale must be finite and greater than zero');
+    }
+    if (!offsetX.isFinite || !offsetY.isFinite || !exposure.isFinite) {
+      throw ArgumentError('Layer transform and exposure values must be finite');
+    }
+  }
 
   final String id;
   final String name;

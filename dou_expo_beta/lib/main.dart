@@ -68,7 +68,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  double _cameraEv=0;
  int _selfTimer=0;
  double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1,_gestureStartScale=1;
- Offset _offset=Offset.zero,_gestureStartOffset=Offset.zero;
+ Offset _offset=Offset.zero,_gestureStartOffset=Offset.zero,_gestureStartFocalPoint=Offset.zero;
  final List<MaskStroke> _maskStrokes=[];
  Path? _activeMaskPath;
  bool _maskEdit=false,_eraseBrush=false;
@@ -234,7 +234,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    child:ClipRRect(borderRadius:BorderRadius.circular(18),child:GestureDetector(
     onDoubleTap:_reset,
     onScaleStart:(d){
-     _gestureStartScale=_scale;_gestureStartOffset=_offset;
+     _gestureStartScale=_scale;_gestureStartOffset=_offset;_gestureStartFocalPoint=d.focalPoint;
      if(!_maskEdit||_overlay==null)return;
      final box=_previewKey.currentContext?.findRenderObject() as RenderBox?;
      if(box==null||box.size.isEmpty)return;
@@ -255,7 +255,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      }else if(_overlay!=null){
       setState((){
        _scale=(_gestureStartScale*d.scale).clamp(.2,5).toDouble();
-       _offset=_gestureStartOffset+Offset(d.focalPointDelta.dx/box.size.width,d.focalPointDelta.dy/box.size.height);
+       _offset=_gestureStartOffset+Offset((d.focalPoint.dx-_gestureStartFocalPoint.dx)/box.size.width,(d.focalPoint.dy-_gestureStartFocalPoint.dy)/box.size.height);
       });
      }
     },

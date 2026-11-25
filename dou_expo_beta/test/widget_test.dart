@@ -12,7 +12,7 @@ void main() {
     expect(find.text('DARKROOM'), findsOneWidget);
 
     await tester.tap(find.text('DOUBLE'));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('DOU EXPO'), findsOneWidget);
     expect(find.text('FIRST PHOTO'), findsWidgets);
     expect(find.text('PATTERN / 2ND'), findsOneWidget);

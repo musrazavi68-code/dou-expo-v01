@@ -8,6 +8,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
+import 'core/project_document.dart';
+import 'core/project_session.dart';
 
 const _ink=Color(0xFF100C0B);
 const _yellow=Color(0xFFFACC15);
@@ -37,7 +39,8 @@ Uint8List _developOrdinaryPhoto(Map<String,Object> args){
 }
 
 class OrdinaryCameraScreen extends StatefulWidget {
- const OrdinaryCameraScreen({super.key});
+ const OrdinaryCameraScreen({super.key,required this.session});
+ final ProjectSession session;
  @override State<OrdinaryCameraScreen> createState()=>_OrdinaryCameraScreenState();
 }
 class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with WidgetsBindingObserver {
@@ -138,7 +141,8 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
 }
 
 class DarkroomScreen extends StatefulWidget {
- const DarkroomScreen({super.key});
+ const DarkroomScreen({super.key,required this.session});
+ final ProjectSession session;
  @override State<DarkroomScreen> createState()=>_DarkroomScreenState();
 }
 class _DarkroomScreenState extends State<DarkroomScreen> {

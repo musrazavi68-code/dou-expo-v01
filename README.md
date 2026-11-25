@@ -1,61 +1,46 @@
-# Dou Expo 2.0 — Multiple Exposure Studio
+# Dou Expo 2.3.0 — Multiple Exposure Studio
 
-A fresh Android-first Expo application, version **2.0.0**, built around the multi-layer compositing workflow inspired by BlendCamera. This is a clean V2 application scaffold and does not package the previous v1.3.0 project archive.
+بازسازی بر پایه آخرین سورس موفق و APK تأییدشده در Actions (نسخه 2.2.2، اجرای #50، commit مبنا `f4e1c2e1b395c2b428c653927c33339d8468bb96`). این شاخه نسخه مستقل بازسازی‌شده 2.3.0 است.
 
-## V2 direction
-- Multi-photo import and unlimited layer stack
-- Live canvas composition with Normal, Multiply, Screen, Overlay, Soft Light, Hard Light, Darken, Lighten, Color Dodge, Difference, Color and Luminosity modes
-- Opacity control, eight gradient directions, bright/dark luminance transparency
-- Offline composition using the on-device WebView Canvas engine
-- High-quality JPEG export to Android gallery or share sheet
-- English/Persian language toggle
-- Dark premium UI with adaptive React Native layout foundations
-- Package ID: `com.mrazavi.douexpo.v2`
+## شناسه و سازگاری
+- Version: 2.3.0
+- Android versionCode: 25
+- Application ID: `com.mrazavi.douexpo.v2`
+- Minimum Android: 8.0 / API 26
+- Expo SDK 54 / React Native 0.81
+- Android ABIs: armeabi-v7a و arm64-v8a
 
-## Build locally
+## امکانات موجود در سورس مبنا
+- ثبت دو نوردهی با دوربین و انتخاب تصویر از گالری
+- ترکیب دو تصویر و لایه‌ها با حالت‌های Normal, Screen, Lighten, Multiply, Overlay, Soft Light, Hard Light, Darken, Color Dodge, Difference, Exclusion و Luminosity
+- کنترل opacity و پیش‌نمایش Canvas در WebView
+- 30 ماسک برداری آماده در دسته‌های انسان، طبیعت، انتزاعی، معماری، اشیا و حیوانات
+- حالت‌های stencil، tint و white برای ماسک
+- تنظیمات exposure، contrast، highlights، shadows، temperature، tint، saturation و vibrance
+- بازیابی خودکار آخرین وضعیت پروژه پس از بسته‌شدن ناگهانی
+- ذخیره در گالری و اشتراک‌گذاری
+- رابط فارسی/انگلیسی و چیدمان واکنش‌گرا
+
+## دارایی‌ها و داده‌ها
+- کتابخانه 50 پترن مستقل در `design_assets/Dou_Expo_Pattern_Library_50_v1.3.0.zip`
+- فایل Figma و Graphics Kit در Release اصلی مخزن باقی می‌مانند.
+- APK مرجع نسخه 2.2.2 از اجرای موفق #50 است؛ برای نسخه 2.3.0 باید workflow همین شاخه اجرا شود.
+
+## Build
 ```bash
 npm install
-npx expo prebuild --platform android --non-interactive
+npx expo install --check
+npx expo export --platform android --output-dir dist-check
+CI=1 npx expo prebuild --platform android --clean
 cd android
 ./gradlew assembleDebug
 ```
 
-## Build artifact
-Push to `dou-expo-v2-blendcamera` or run the Android workflow manually. The APK is uploaded as `Dou-Expo-V2-Android-APK`.
+## GitHub Actions و Release
+Push به شاخه `dou-expo-v2.3.0-rebuild` ساخت APK و آزمون‌های سازگاری را اجرا می‌کند. Push تگ `v2.3.0` پس از ساخت موفق، Release می‌سازد و APK آزمایشی و checksum را به آن متصل می‌کند.
+
+## محدوده‌ای که هنوز کامل/تأیید نشده
+ماسک هوشمند segmentation، جابه‌جایی/چرخش/تغییر اندازه مستقل هر لایه و خروجی Release امضاشده در سورس مبنا تأیید نشده‌اند. این موارد را به‌عنوان قابلیت حاضر معرفی نمی‌کنیم. APK نسخه جدید فقط پس از اجرای موفق Actions و نصب روی دستگاه واقعی قابل تأیید است.
 
 ## Developer
 M.Razavi — Created by dou expo app
-
-## Note
-BlendCamera is a reference for workflow and feature ideas only. Dou Expo uses its own implementation and branding; it does not copy proprietary assets or source code.
-
-
-## Build and development status
-
-This branch targets Expo SDK 54 / React Native 0.81 and builds a debug APK with GitHub Actions.
-
-### Included in the current prototype
-- Two-exposure capture flow using the device camera, plus gallery import.
-- 30 built-in stencil paths grouped by people, nature, abstract, architecture, objects and animals.
-- Blend modes, opacity control, stencil / tint / white treatments.
-- Color looks and draggable adjustment controls for exposure, contrast, highlights, shadows, temperature, tint, saturation and vibrance.
-- Layer list, PNG export, gallery save/share and creator watermark.
-
-### Build on GitHub
-Push to `dou-expo-v2-blendcamera` or manually run **Dou Expo V2 Android APK** from the Actions tab. The workflow runs dependency installation, Expo validation, Android prebuild and Gradle debug assembly, then uploads `Dou-Expo-V2.2.0-Android-APK`.
-
-### Planned next engineering stages
-1. Subject-aware masks (person / animal / object segmentation) using an on-device segmentation model; this is not yet implemented in the current prototype.
-2. Independent layer transforms and mask positioning.
-3. High-resolution export and memory-safe processing for mid-range Android devices.
-4. Responsive layout validation on phones, foldables and tablets.
-5. Device testing for camera permissions, gallery access, export and sharing.
-
-Do not treat the APK as release-ready until the latest Actions run succeeds and the exported APK has been installed and tested on physical devices.
-
-
-## Version 2.2.0 build gate
-- Android versionCode: 22
-- CI now validates the Android JavaScript bundle with `expo export --platform android` before generating the native project.
-- APK artifact name: `Dou-Expo-V2.2.0-Android-APK`.
-- A successful CI run is required before the APK can be called installable.

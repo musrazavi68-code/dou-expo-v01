@@ -1,13 +1,17 @@
-name: Dou Expo V2 Android APK
+name: Dou Expo 2.3.0 Android Build
 on:
   push:
-    branches: [dou-expo-v2-blendcamera, dou-expo-android8-compat]
+    branches: [dou-expo-v2.3.0-rebuild]
+    tags: ['v2.3.0']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: dou-expo-2.3.0-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
-    name: Build Dou Expo V2 installable APK
+    name: Build and verify Dou Expo 2.3.0 APK
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -21,29 +25,19 @@ jobs:
           java-version: '17'
       - name: Install dependencies
         run: npm install
-      - name: Diagnose Expo Android autolinking
-        run: |
-          echo '--- Expo and native module versions ---'
-          npm ls expo expo-modules-autolinking expo-modules-core --all || true
-          echo '--- Android autolinking search ---'
-          npx expo-modules-autolinking search --platform android || true
-          echo '--- Android autolinking resolution ---'
-          npx expo-modules-autolinking resolve --platform android || true
       - name: Validate Expo project
         run: npx expo install --check
       - name: Bundle Android JavaScript
         run: npx expo export --platform android --output-dir dist-check
       - name: Generate native Android project
         run: CI=1 npx expo prebuild --platform android --clean
-      - name: Configure all Android ABIs
+      - name: Configure supported phone ABIs
         run: |
           if grep -q '^reactNativeArchitectures=' android/gradle.properties; then
             sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=armeabi-v7a,arm64-v8a/' android/gradle.properties
           else
             echo 'reactNativeArchitectures=armeabi-v7a,arm64-v8a' >> android/gradle.properties
           fi
-          echo '--- Required native ABIs ---'
-          grep '^reactNativeArchitectures=' android/gradle.properties
       - name: Build debug APK
         env:
           GRADLE_OPTS: -Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
@@ -51,46 +45,42 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew --no-daemon --max-workers=2 --stacktrace assembleDebug
-      - name: Collect APK
+      - name: Verify APK identity, SDK, ABIs and alignment
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           APK="$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)"
           test -n "$APK"
-          cp "$APK" artifacts/Dou-Expo-V2.2.2-debug.apk
-          test -s artifacts/Dou-Expo-V2.2.2-debug.apk
-          echo "APK size: $(stat -c%s artifacts/Dou-Expo-V2.2.2-debug.apk) bytes"
-          APK="$PWD/artifacts/Dou-Expo-V2.2.2-debug.apk"
-          echo '--- APK native ABI inventory ---'
-          unzip -Z1 "$APK" | awk -F/ '$1 == "lib" {print $2}' | sort -u
-          APK_ENTRIES="$(unzip -Z1 "$APK")"
-          for ABI in armeabi-v7a arm64-v8a; do
-            echo "$APK_ENTRIES" | grep -q "^lib/$ABI/" || { echo "Missing required ABI: $ABI"; exit 1; }
-          done
-          echo 'Both Android phone ABIs are present.'
-          ABI_LIST="$(echo "$APK_ENTRIES" | awk -F/ '$1 == "lib" {print $2}' | sort -u | tr '\n' ' ')"
-          echo "Packaged Android phone ABIs: $ABI_LIST"
+          cp "$APK" artifacts/Dou-Expo-v2.3.0-debug.apk
+          APK="$PWD/artifacts/Dou-Expo-v2.3.0-debug.apk"
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          APKSIGNER="$(find "$SDK_DIR/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -1)"
-          AAPT="$(find "$SDK_DIR/build-tools" -type f \( -name aapt -o -name aapt2 \) 2>/dev/null | sort -V | tail -1)"
-          test -n "$APKSIGNER"
+          APKSIGNER="$(find "$SDK_DIR/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          AAPT="$(find "$SDK_DIR/build-tools" -type f \( -name aapt -o -name aapt2 \) | sort -V | tail -1)"
+          APKANALYZER="$(find "$SDK_DIR" -type f -name apkanalyzer | head -1)"
+          ZIPALIGN="$(find "$SDK_DIR/build-tools" -type f -name zipalign | sort -V | tail -1)"
+          test -n "$APKSIGNER"; test -n "$AAPT"; test -n "$APKANALYZER"; test -n "$ZIPALIGN"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
-          test -n "$AAPT"
           BADGING="$("$AAPT" dump badging "$APK")"
-          echo "$BADGING" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
-          echo "$BADGING" | grep -q "package: name='com.mrazavi.douexpo.v2' versionCode='24' versionName='2.2.2'" || { echo 'Unexpected application identity or version'; exit 1; }
-          APKANALYZER="$(find "$SDK_DIR" -type f -name apkanalyzer 2>/dev/null | head -1)"
-          test -n "$APKANALYZER"
+          echo "$BADGING" | grep -E '^(package:|sdkVersion:|targetSdkVersion:|native-code:)'
+          echo "$BADGING" | grep -q "package: name='com.mrazavi.douexpo.v2' versionCode='25' versionName='2.3.0'"
           MIN_SDK="$("$APKANALYZER" manifest min-sdk "$APK")"
-          echo "APK minimum Android SDK: $MIN_SDK"
-          test "$MIN_SDK" = "26" || { echo "Expected minimum SDK 26 (Android 8.0), got: $MIN_SDK"; exit 1; }
-          echo 'Install compatibility gate passed: Android 8.0+, package identity and native ABIs verified.'
-          ZIPALIGN="$(find "$SDK_DIR/build-tools" -type f -name zipalign 2>/dev/null | sort -V | tail -1)"
-          test -n "$ZIPALIGN"
+          test "$MIN_SDK" = "26"
+          ENTRIES="$(unzip -Z1 "$APK")"
+          for ABI in armeabi-v7a arm64-v8a; do echo "$ENTRIES" | grep -q "^lib/$ABI/"; done
           "$ZIPALIGN" -c -v 4 "$APK"
           sha256sum "$APK" > artifacts/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-V2.2.2-Android-APK
+          name: Dou-Expo-v2.3.0-Android-APK
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Dou Expo v2.3.0
+          generate_release_notes: true
+          files: |
+            artifacts/Dou-Expo-v2.3.0-debug.apk
+            artifacts/SHA256SUMS.txt

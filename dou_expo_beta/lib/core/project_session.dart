@@ -142,6 +142,24 @@ class ProjectSession extends ChangeNotifier {
     }
   }
 
+  /// Restores the currently selected project's persisted snapshot, if present.
+  /// Existing edits are saved first so recovery never discards dirty work.
+  Future<bool> restoreCurrent() async {
+    if (_dirty || _saving) await save();
+    final revisionAtStart = _revision;
+    final loaded = await _restore(document.id);
+    if (loaded == null) return false;
+    if (_revision != revisionAtStart || _dirty || _saving) return false;
+    if (loaded.id != document.id) {
+      throw FormatException('Restored project identifier does not match the active id');
+    }
+    _history.reset(loaded);
+    _revision++;
+    _dirty = false;
+    notifyListeners();
+    return true;
+  }
+
   /// A slow read must not overwrite edits made while it was in flight.
   Future<bool> open(String id) async {
     if (id == document.id) return true;

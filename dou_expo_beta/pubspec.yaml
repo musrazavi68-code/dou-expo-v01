@@ -1,22 +1,31 @@
 name: dou_expo_beta
-description: "Dou Expo Beta - multi-exposure pattern studio"
+description: "Dou expo Beta - live camera multi-exposure and pixel-rendered photo studio."
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: ">=3.12.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  camera: ^0.12.2
   image_picker: ^1.1.2
+  path_provider: ^2.1.6
+  gal: ^3.0.1
   share_plus: ^10.0.0
-  path_provider: ^2.1.5
-  gal: ^2.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.1
+
+# Add assets/icon/app_icon.png before running dart run flutter_launcher_icons.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 24
 
 flutter:
   uses-material-design: true

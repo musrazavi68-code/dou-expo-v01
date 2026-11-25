@@ -170,8 +170,11 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
    if(path!=null&&path!=_loadedDarkroomPath){final file=await ProjectStore().resolveAsset(project.id,path);bytes=await file.readAsBytes();}
    if(token!=_restoreToken||!mounted)return;
    final raw=project.canvas['darkroom'];
-   if(raw is Map){final settings=Map<String,Object?>.from(raw);_brightness=(settings['brightness'] as num?)?.toDouble()??_brightness;_contrast=(settings['contrast'] as num?)?.toDouble()??_contrast;_saturation=(settings['saturation'] as num?)?.toDouble()??_saturation;}
-   if(path==null||bytes!=null){setState(() {_photoBytes=bytes;_loadedDarkroomPath=path;});}
+   setState((){
+    if(raw is Map){final settings=Map<String,Object?>.from(raw);_brightness=(settings['brightness'] as num?)?.toDouble()??_brightness;_contrast=(settings['contrast'] as num?)?.toDouble()??_contrast;_saturation=(settings['saturation'] as num?)?.toDouble()??_saturation;}
+    if(path==null){_photoBytes=null;_loadedDarkroomPath=null;}
+    else if(bytes!=null){_photoBytes=bytes;_loadedDarkroomPath=path;}
+   });
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Darkroom restore failed: $e')));}
  }
  Future<void> _pick() async {

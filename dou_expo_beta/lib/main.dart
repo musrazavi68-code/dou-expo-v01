@@ -218,6 +218,19 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
    overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes,stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint,contrast:_contrast,saturation:_saturation,filmEffect:_filmEffect,effectAmount:_effectAmount);
  }
+ List<Map<String,Object?>> _serializeMaskStrokes(){
+  return _maskStrokes.map((stroke){
+   final points=<Map<String,double>>[];
+   for(final metric in stroke.path.computeMetrics()){
+    final count=math.max(1,(metric.length/0.015).ceil());
+    for(var i=0;i<=count;i++){
+     final tangent=metric.getTangentForOffset(metric.length*i/count);
+     if(tangent!=null)points.add({'x':tangent.position.dx,'y':tangent.position.dy});
+    }
+   }
+   return <String,Object?>{'width':stroke.width,'erase':stroke.erase,'points':points};
+  }).toList(growable:false);
+ }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
   var ri=0,si=0;var unit='px',cm=30.0,dpi=300,format='PNG';const sizes=< (String,int) >[('Original size',0),('2048 px',2048),('4096 px',4096)];
@@ -256,6 +269,15 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  Future<void> _save(double ratio,int size,String format) async {
   if(_busy)return;setState(()=>_busy=true);
   try{
+   final current=widget.session.document;
+   widget.session.replace(current.copyWith(canvas:{...current.canvas,'lastEditedIn':'doubleExposure',
+    'doubleExposure':{'mix':_mix,'baseExposure':_baseEv,'overlayExposure':_overlayEv,
+     'offsetX':_offset.dx,'offsetY':_offset.dy,'scale':_scale,'blend':_modes[_blend].$1,
+     'maskMode':_maskMode.name,'maskFeather':_maskFeather,'brushSize':_brushSize,
+     'maskStrokes':_serializeMaskStrokes(),'contrast':_contrast,'saturation':_saturation,
+     'filmEffect':_filmEffect.name,'effectAmount':_effectAmount,'stencil':_stencil.name,
+     'stencilFill':_stencilFill.name,'stencilTint':_stencilTint.value,
+     'exportRatio':ratio,'exportMaxSide':size,'exportFormat':format}}));
    final pngBytes=await _render(ratio,size);
    Uint8List outputBytes=pngBytes;
    final extension=format=='JPEG'?'jpg':'png';
@@ -264,10 +286,10 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     if(decoded==null)throw StateError('Could not decode rendered image for JPEG export');
     outputBytes=Uint8List.fromList(img.encodeJpg(decoded,quality:95));
    }
-   await Gal.putImageBytes(outputBytes,
-    name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+extension,album:'Dou Expo');
+   await Gal.putImageBytes(outputBytes,name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+extension,album:'Dou Expo');
    _toast(format+' saved to Gallery'+(format=='JPEG'?' · quality 95':' · lossless'));
-  }catch(e){_toast('Export failed: '+e.toString());}finally{if(mounted)setState(()=>_busy=false);}
+  }catch(e){_toast('Export failed: '+e.toString());}
+  finally{if(mounted)setState(()=>_busy=false);}
  }
  Future<void> _share() async {
   if(_base==null||_busy)return;setState(()=>_busy=true);

@@ -68,7 +68,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    setState((){
     if(path==null){_lastShotBytes=null;_loadedOrdinaryPath=null;}
     else{
-     if(bytes!=null){_lastShotBytes=bytes;_loadedOrdinaryPath=path;_lastShot=null;}
+     if(bytes!=null){_lastShotBytes=bytes;_loadedOrdinaryPath=path;}
      final film=layer?.settings['film'];if(film is String)_film=film;
     }
    });

@@ -256,7 +256,7 @@ class ExposureComposer {
         canvas.clipPath(StencilLibrary.pathFor(stencil, size), doAntiAlias: true);
       }
       final overlayColorMatrix = stencil != StencilKind.none && stencilFillMode != StencilFillMode.photo
-          ? <double>[0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.red.toDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.green.toDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.blue.toDouble(), 0,0,0,1,0]
+          ? <double>[0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : (stencilTint.r * 255).roundToDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : (stencilTint.g * 255).roundToDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : (stencilTint.b * 255).roundToDouble(), 0,0,0,1,0]
           : toneMatrix(overlayEv, contrast, saturation);
       if (maskMode == OverlayMaskMode.fullFrame && maskStrokes.isEmpty) {
         canvas.drawImageRect(

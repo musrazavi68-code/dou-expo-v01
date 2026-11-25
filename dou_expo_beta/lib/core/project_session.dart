@@ -105,6 +105,13 @@ class ProjectSession extends ChangeNotifier {
     return value;
   }
 
+  /// Clears only this in-memory session's undo/redo snapshots.
+  /// The current project document and its persisted assets remain untouched.
+  void clearHistory() {
+    _history.reset(document);
+    notifyListeners();
+  }
+
   /// Persists the asset before a manifest can refer to its stable path.
   Future<String> addAsset(String fileName, Uint8List bytes) =>
       _writeAsset(document.id, fileName, bytes);

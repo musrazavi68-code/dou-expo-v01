@@ -69,7 +69,7 @@ class StencilLibrary {
         p.cubicTo(w*.65,h*.34,w*.98,h*.48,w*.78,h*.82); p.cubicTo(w*.7,h*.94,w*.6,h*.98,w*.5,h*.96); p.close(); return p;
       case StencilKind.hand:
         p.moveTo(w*.3,h*.94); p.lineTo(w*.3,h*.48);
-        for (var handIndex=0;handIndex<4;handIndex++) { final x=w*(.22+handIndex*.15); p.lineTo(x,h*.48); p.lineTo(x,h*(.12+(j%2)*.04)); p.quadraticBezierTo(x,h*.04,x+w*.07,h*.1); p.lineTo(x+w*.07,h*.52); }
+        for (var handIndex=0;handIndex<4;handIndex++) { final x=w*(.22+handIndex*.15); p.lineTo(x,h*.48); p.lineTo(x,h*(.12+(handIndex%2)*.04)); p.quadraticBezierTo(x,h*.04,x+w*.07,h*.1); p.lineTo(x+w*.07,h*.52); }
         p.lineTo(w*.82,h*.62); p.quadraticBezierTo(w*.95,h*.64,w*.88,h*.76); p.lineTo(w*.7,h*.94); p.close(); return p;
       case StencilKind.brokenChain:
         p.addOval(Rect.fromLTWH(w*.08,h*.18,w*.48,h*.34));
@@ -101,7 +101,7 @@ class StencilLibrary {
       case StencilKind.laurel:
       case StencilKind.wreath:
         p.addOval(Rect.fromLTWH(w*.16,h*.12,w*.68,h*.78));
-        for(var wreathIndex=0;wreathIndex<9;wreathIndex++){final y=h*(.2+wreathIndex*.075); p.addOval(Rect.fromLTWH(w*(wreathIndex%2==0?.16:.68),y,w*.16,h*.065));}
+        for(var wreathIndex=0;wreathIndex<9;wreathIndex++){final y=h*(.2+wreathIndex*.075); p.addOval(Rect.fromLTWH(w*(wreathIndex % 2 == 0 ? .16 : .68),y,w*.16,h*.065));}
         return p;
       case StencilKind.persianGuard:
         p.moveTo(w*.5,h*.04); p.lineTo(w*.68,h*.12); p.lineTo(w*.72,h*.3);

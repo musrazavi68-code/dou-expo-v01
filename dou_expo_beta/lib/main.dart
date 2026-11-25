@@ -11,6 +11,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'exposure_composer.dart';
 import 'studio_modes.dart';
+import 'core/project_document.dart';
+import 'core/project_session.dart';
+import 'core/autosave_coordinator.dart';
 
 void main() {
  WidgetsFlutterBinding.ensureInitialized();
@@ -29,13 +32,18 @@ class DouExpoShell extends StatefulWidget {
  const DouExpoShell({super.key});
  @override State<DouExpoShell> createState()=>_DouExpoShellState();
 }
-class _DouExpoShellState extends State<DouExpoShell> {
+class _DouExpoShellState extends State<DouExpoShell> with WidgetsBindingObserver {
  int _index=0;
+ late final ProjectSession _session;
+ late final AutosaveCoordinator _autosave;
+ @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);final now=DateTime.now().toUtc();_session=ProjectSession(initial:ProjectDocument(id:'dou-expo-main',name:'Dou Expo Project',createdAt:now,updatedAt:now,canvas:const {},layers:const []));_autosave=AutosaveCoordinator(session:_session,onError:(e,st)=>debugPrint('Autosave failed: $e'));}
+ @override void didChangeAppLifecycleState(AppLifecycleState s){if(s==AppLifecycleState.paused||s==AppLifecycleState.inactive){_autosave.flush().catchError((Object e,StackTrace st){debugPrint('Autosave flush failed: $e');});}}
+ @override void dispose(){WidgetsBinding.instance.removeObserver(this);_autosave.dispose();_session.dispose();super.dispose();}
  @override Widget build(BuildContext context) {
   final pages=<Widget>[
-   const OrdinaryCameraScreen(),
-   const DouExpoEditor(),
-   const DarkroomScreen(),
+   OrdinaryCameraScreen(session:_session),
+   DouExpoEditor(session:_session),
+   DarkroomScreen(session:_session),
   ];
   return Scaffold(
    body:pages[_index],
@@ -55,7 +63,8 @@ class _DouExpoShellState extends State<DouExpoShell> {
 }
 
 class DouExpoEditor extends StatefulWidget {
- const DouExpoEditor({super.key});
+ const DouExpoEditor({super.key,required this.session});
+ final ProjectSession session;
  @override State<DouExpoEditor> createState()=>_DouExpoEditorState();
 }
 class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserver {

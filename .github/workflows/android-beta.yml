@@ -1,12 +1,12 @@
-name: Dou Expo Android Beta
+name: Dou Expo Android Beta 1.0.1
 on:
   workflow_dispatch:
   push:
-    branches: [ "dou-expo-beta-1.0.0" ]
+    branches: [ "dou-expo-beta-1.0.1" ]
 permissions:
   contents: read
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,13 +25,22 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-      - run: npm install
-      - run: npx tsc --noEmit
-      - run: npm run prebuild:android
-      - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - name: Install dependencies
+        run: npm install
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Generate launcher assets and native Android project
+        run: npm run prebuild:android
+      - name: Build standalone release APK
+        run: cd android && chmod +x gradlew && ./gradlew --no-daemon assembleRelease
+      - name: Verify embedded React Native bundle
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" | grep -E 'assets/index\.android\.bundle|assets/index\.bundle'
       - uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-Beta-1.0.0-APK
-          path: beta-app/android/app/build/outputs/apk/debug/app-debug.apk
+          name: Dou-Expo-Beta-1.0.1-Release-APK
+          path: beta-app/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+          retention-days: 30

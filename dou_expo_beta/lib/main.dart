@@ -66,7 +66,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  Future<void> _capture() async {
   final c=_camera;if(c==null||!c.value.isInitialized){_toast('Camera not ready');return;}
   try{final x=await c.takePicture();final im=await ExposureComposer.decode(await File(x.path).readAsBytes());
-   if(!mounted){im.dispose();return;}setState((){_base?.dispose();_base=im;});
+   if(!mounted){im.dispose();return;}
+   setState((){if(_base==null){_base=im;}else{_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}});
    _camera=null;_cameraOpen=false;_cameraReady=false;await c.dispose();
   }catch(e){_toast('Capture failed: '+e.toString());}
  }
@@ -151,11 +152,11 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
      overlayOffset:_offset,overlayScale:_scale),
-     child:b==null?(_cameraOpen && _cameraReady && _camera!=null
+     child:_cameraOpen && _cameraReady && _camera!=null
       ? CameraPreview(_camera!)
-      : Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
        const Icon(Icons.add_photo_alternate_outlined,size:48,color:Colors.white54),
-       const Text('Choose your first photo'),FilledButton(onPressed:()=>_load(false),child:const Text('FIRST PHOTO'))])))
+       const Text('Choose your first photo'),FilledButton(onPressed:()=>_load(false),child:const Text('FIRST PHOTO'))]))
       :const SizedBox.expand())
    )))),
    if(b!=null)const Padding(padding:EdgeInsets.only(bottom:8),

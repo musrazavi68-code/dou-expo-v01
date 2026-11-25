@@ -136,13 +136,27 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   else{_cameraOpen=true;await _startCamera();}
  }
  Future<void> _switchLens() async {
-  if(_cameras.length<2){_toast('No second camera lens');return;}
-  final old=_camera;_camera=null;await old?.dispose();
-  _cameraIndex=(_cameraIndex+1)%_cameras.length;
-  final next=CameraController(_cameras[_cameraIndex],ResolutionPreset.high,enableAudio:false);
-  try{await next.initialize();if(!mounted){await next.dispose();return;}
-   setState((){_camera=next;_cameraOpen=true;_cameraReady=true;});
-  }catch(e){await next.dispose();_toast('Lens switch failed: '+e.toString());}
+  if(_cameras.length<2||_cameraStarting)return;
+  _cameraStarting=true;
+  final old=_camera;
+  _camera=null;
+  if(mounted)setState(()=>_cameraReady=false);
+  CameraController? candidate;
+  try{
+   await old?.dispose();
+   if(!mounted||!_cameraOpen)return;
+   _cameraIndex=(_cameraIndex+1)%_cameras.length;
+   candidate=CameraController(_cameras[_cameraIndex],ResolutionPreset.high,enableAudio:false);
+   await candidate.initialize();
+   if(!mounted||!_cameraOpen){await candidate.dispose();return;}
+   setState(()=>_camera=candidate);
+   setState(()=>_cameraReady=true);
+  }catch(e){
+   await candidate?.dispose();
+   if(mounted)_toast('Lens switch failed: '+e.toString());
+  }finally{
+   _cameraStarting=false;
+  }
  }
  Future<Uint8List> _render(double ratio,int maxSide) async {
   final b=_base;if(b==null)throw StateError('Choose first photo');

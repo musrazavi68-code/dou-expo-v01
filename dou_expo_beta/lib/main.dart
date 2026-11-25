@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
@@ -42,7 +41,6 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  StencilKind _stencil=StencilKind.none;
  StencilFillMode _stencilFill=StencilFillMode.photo;
  Color _stencilTint=const Color(0xFFFF8A00);
- bool _tintReady=false;
  double _contrast=1,_saturation=1,_effectAmount=.35;
  FilmEffect _filmEffect=FilmEffect.none;
  int _blend=0,_cameraIndex=0;

@@ -191,7 +191,7 @@ class ExposureComposer {
             ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
             ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
         );
-        canvas.saveLayer(Offset.zero & size, Paint());
+        canvas.saveLayer(Offset.zero & size, Paint()..blendMode = BlendMode.dstIn);
         final maskPaint = Paint()
           ..color = const Color(0xFFFFFFFF)
           ..style = PaintingStyle.fill
@@ -238,7 +238,7 @@ class ExposureComposer {
           );
           canvas.restore();
         }
-        canvas.restore(Paint()..blendMode = BlendMode.dstIn);
+        canvas.restore();
         canvas.restore();
       }
       if (stencil != StencilKind.none) canvas.restore();

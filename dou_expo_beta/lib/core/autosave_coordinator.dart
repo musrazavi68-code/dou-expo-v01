@@ -3,10 +3,6 @@ import 'dart:async';
 import 'project_session.dart';
 
 /// Debounced autosave policy kept outside widgets and feature screens.
-///
-/// Call [markChanged] after a completed user action and [flush] when the app
-/// becomes inactive/paused. A failed save is surfaced to the owner and the
-/// session remains dirty so a later flush can retry.
 class AutosaveCoordinator {
   AutosaveCoordinator({
     required ProjectSession session,
@@ -33,33 +29,36 @@ class AutosaveCoordinator {
     _timer?.cancel();
     _timer = Timer(debounce, () {
       _timer = null;
-      unawaited(_saveAndReport());
+      unawaited(_saveInBackground());
     });
   }
 
-  Future<void> _saveAndReport() async {
+  Future<void> _saveInBackground() async {
     try {
       if (_session.isDirty) await _session.save();
     } catch (error, stackTrace) {
+      // Background timer failures are reported but never become unhandled
+      // asynchronous exceptions. Dirty state remains available for retry.
       onError?.call(error, stackTrace);
     }
   }
 
-  /// Cancels the debounce and waits for the current session revision to save.
+  /// Explicit flush propagates errors to its caller so lifecycle owners can
+  /// show a retry/leave-with-unsaved-changes decision instead of hiding data loss.
   Future<void> flush() {
     if (_disposed) return Future<void>.value();
     _timer?.cancel();
     _timer = null;
     final active = _flushFuture;
     if (active != null) return active;
-    final operation = _saveAndReport();
+    final operation = _session.isDirty ? _session.save() : Future<void>.value();
     _flushFuture = operation;
     return operation.whenComplete(() {
       if (identical(_flushFuture, operation)) _flushFuture = null;
     });
   }
 
-  /// Stops future timers. Call [flush] before disposing when data is dirty.
+  /// Stops future timers. The owner should await [flush] before disposing.
   void dispose() {
     _disposed = true;
     _timer?.cancel();

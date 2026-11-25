@@ -24,13 +24,26 @@ class ProjectSession {
     ProjectStore? store,
   }) {
     final projectStore = store ?? ProjectStore();
-    return ProjectSession._(
+    return ProjectSession.withBackend(
       initial: initial,
       persist: projectStore.save,
       restore: projectStore.load,
       writeAsset: projectStore.saveAsset,
     );
   }
+
+  /// Backend injection keeps session behavior testable without platform IO.
+  factory ProjectSession.withBackend({
+    required ProjectDocument initial,
+    required Future<void> Function(ProjectDocument) persist,
+    required Future<ProjectDocument?> Function(String) restore,
+    required Future<String> Function(String, String, List<int>) writeAsset,
+  }) => ProjectSession._(
+        initial: initial,
+        persist: persist,
+        restore: restore,
+        writeAsset: writeAsset,
+      );
 
   final HistoryStack<ProjectDocument> _history;
   final Future<void> Function(ProjectDocument) _persist;
@@ -39,6 +52,7 @@ class ProjectSession {
 
   bool _dirty = false;
   bool _saving = false;
+  int _revision = 0;
 
   ProjectDocument get document => _history.current;
   bool get isDirty => _dirty;
@@ -48,23 +62,31 @@ class ProjectSession {
 
   /// Atomically publishes a complete immutable document snapshot.
   void replace(ProjectDocument next) {
+    if (_saving && next.id != document.id) {
+      throw StateError('Cannot switch projects while saving');
+    }
     if (next.id != document.id) {
       throw ArgumentError('A session cannot be replaced with another project id');
     }
     if (identical(next, document)) return;
     _history.record(next);
+    _markDirty();
+  }
+
+  void _markDirty() {
+    _revision++;
     _dirty = true;
   }
 
   ProjectDocument? undo() {
     final value = _history.undo();
-    if (value != null) _dirty = true;
+    if (value != null) _markDirty();
     return value;
   }
 
   ProjectDocument? redo() {
     final value = _history.redo();
-    if (value != null) _dirty = true;
+    if (value != null) _markDirty();
     return value;
   }
 
@@ -75,9 +97,15 @@ class ProjectSession {
   Future<void> save() async {
     if (_saving) throw StateError('A project save is already in progress');
     _saving = true;
+    final revisionAtStart = _revision;
+    final snapshot = document;
     try {
-      await _persist(document);
-      _dirty = false;
+      await _persist(snapshot);
+      // An edit may have happened while disk IO was in progress. In that
+      // case the persisted snapshot is valid, but the newer state stays dirty.
+      if (_revision == revisionAtStart && identical(document, snapshot)) {
+        _dirty = false;
+      }
     } finally {
       _saving = false;
     }
@@ -89,6 +117,7 @@ class ProjectSession {
     final loaded = await _restore(id);
     if (loaded == null) return false;
     _history.reset(loaded);
+    _revision++;
     _dirty = false;
     return true;
   }

@@ -35,7 +35,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  bool _cameraOpen=false,_cameraReady=false,_busy=false;
  double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1;
  Offset _offset=Offset.zero;
- int _blend=0;
+ int _blend=0,_cameraIndex=0;
  static const _modes=< (String,BlendMode) >[
   ('BRIGHT / SCREEN',BlendMode.screen),('LIGHTEN',BlendMode.lighten),('ADD',BlendMode.plus),
   ('OVERLAY',BlendMode.overlay),('SOFT LIGHT',BlendMode.softLight),('MULTIPLY',BlendMode.multiply),
@@ -50,10 +50,10 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  }
  Future<void> _startCamera() async {
   try{_cameras=await availableCameras();if(_cameras.isEmpty)return;
-   final c=CameraController(_cameras.first,ResolutionPreset.high,enableAudio:false);
+   final c=CameraController(_cameras[_cameraIndex % _cameras.length],ResolutionPreset.high,enableAudio:false);
    await c.initialize();if(!mounted){await c.dispose();return;}
    setState((){_camera=c;_cameraReady=true;_cameraOpen=true;});
-  }on CameraException catch(e){_toast('Camera: '+(e.description??e.code));}
+  }catch(e){_toast('Camera: '+e.toString());}
  }
  void _toast(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
  Future<void> _load(bool second) async {
@@ -74,18 +74,28 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   if(_cameraOpen){final c=_camera;_camera=null;setState((){_cameraOpen=false;_cameraReady=false;});await c?.dispose();}
   else{await _startCamera();}
  }
+ Future<void> _switchLens() async {
+  if(_cameras.length<2){_toast('No second camera lens');return;}
+  final old=_camera;_camera=null;await old?.dispose();
+  _cameraIndex=(_cameraIndex+1)%_cameras.length;
+  final next=CameraController(_cameras[_cameraIndex],ResolutionPreset.high,enableAudio:false);
+  try{await next.initialize();if(!mounted){await next.dispose();return;}
+   setState((){_camera=next;_cameraOpen=true;_cameraReady=true;});
+  }catch(e){await next.dispose();_toast('Lens switch failed: '+e.toString());}
+ }
  Future<Uint8List> _render(double ratio,int maxSide) async {
   final b=_base;if(b==null)throw StateError('Choose first photo');
   final r=ratio==0?b.width/b.height:ratio;
-  final w=r>=1?maxSide:math.max(1,(maxSide*r).round());
-  final h=r>=1?math.max(1,(maxSide/r).round()):maxSide;
+  final side=maxSide==0?math.max(b.width,b.height):maxSide;
+  final w=r>=1?side:math.max(1,(side*r).round());
+  final h=r>=1?math.max(1,(side/r).round()):side;
   return ExposureComposer.renderPng(base:b,overlay:_overlay,width:w,height:h,
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
    overlayOffset:_offset,overlayScale:_scale);
  }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
-  var ri=0,si=0;const sizes=< (String,int) >[('Original size',4096),('2048 px',2048),('4096 px',4096)];
+  var ri=0,si=0;const sizes=< (String,int) >[('Original size',0),('2048 px',2048),('4096 px',4096)];
   await showModalBottomSheet<void>(context:context,backgroundColor:const Color(0xFF17171B),
    builder:(ctx)=>StatefulBuilder(builder:(ctx,ss)=>SafeArea(child:Padding(padding:const EdgeInsets.all(18),
     child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
@@ -141,10 +151,11 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
      overlayOffset:_offset,overlayScale:_scale),
-     child:b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
-      const Icon(Icons.add_photo_alternate_outlined,size:48,color:Colors.white54),
-      const Text('Choose your first photo'),FilledButton(onPressed:()=>_load(false),child:const Text('FIRST PHOTO')),
-      if(_cameraReady)TextButton(onPressed:_capture,child:const Text('CAPTURE'))]))
+     child:b==null?(_cameraOpen && _cameraReady && _camera!=null
+      ? CameraPreview(_camera!)
+      : Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+       const Icon(Icons.add_photo_alternate_outlined,size:48,color:Colors.white54),
+       const Text('Choose your first photo'),FilledButton(onPressed:()=>_load(false),child:const Text('FIRST PHOTO'))])))
       :const SizedBox.expand())
    )))),
    if(b!=null)const Padding(padding:EdgeInsets.only(bottom:8),
@@ -168,7 +179,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     _button(Icons.layers_outlined,'PATTERN / 2ND',()=>_load(true)),
     _button(Icons.blender_outlined,'BLEND',_overlay==null?null:_chooseBlend),
     _button(Icons.camera_alt_outlined,'CAMERA',_toggleCamera),
-    _button(Icons.flip_camera_android,'CAPTURE',_cameraReady?_capture:null),
+    _button(Icons.flip_camera_android,'FLIP LENS',_switchLens),
+    _button(Icons.camera,'CAPTURE',_cameraReady?_capture:null),
    ]),
    if(_overlay!=null)...[
     _slider('MIX / OPACITY',_mix,(v)=>setState(()=>_mix=v)),

@@ -33,7 +33,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  List<CameraDescription> _cameras=[];
  ui.Image? _base,_overlay;
  bool _cameraOpen=false,_cameraReady=false,_busy=false;
- double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1;
+ double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1,_scaleStart=1;
  Offset _offset=Offset.zero;
  int _blend=0,_cameraIndex=0;
  static const _modes=< (String,BlendMode) >[

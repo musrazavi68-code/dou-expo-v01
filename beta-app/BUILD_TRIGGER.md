@@ -1,0 +1,1 @@
+Beta build trigger. The Android Beta APK workflow uses the current Android SDK platform and build-tools packages.

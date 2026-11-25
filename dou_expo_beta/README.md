@@ -22,3 +22,6 @@ flutter build apk --release
 - چیدمان واکنش‌گرا برای موبایل و نمایشگرهای عریض
 
 توجه: پترن‌های این نسخه پایه گرادیانی هستند؛ بانک بافت‌های تصویری واقعی و ماسک مستقل لایه‌ها مرحله توسعه بعدی است.
+
+
+Build workflow: `.github/workflows/dou-expo-flutter.yml` — release APK is published as a GitHub Actions artifact after successful analysis and compilation.

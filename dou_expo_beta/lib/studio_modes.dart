@@ -215,9 +215,10 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
  }
  Future<void> _export() async {
   final photo=_photo;
-  if(photo==null)return;
+  final sourceBytes=_photoBytes??(photo==null?null:await photo.readAsBytes());
+  if(sourceBytes==null)return;
   try{
-   final codec=await ui.instantiateImageCodec(await photo.readAsBytes());
+   final codec=await ui.instantiateImageCodec(sourceBytes);
    final frame=await codec.getNextFrame();
    final source=frame.image;
    codec.dispose();
@@ -260,7 +261,7 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
     _control('BRIGHTNESS',_brightness,-1,1,(v)=>setState(()=>_brightness=v)),
     _control('CONTRAST',_contrast,0,2,(v)=>setState(()=>_contrast=v)),
     _control('SATURATION',_saturation,0,2,(v)=>setState(()=>_saturation=v)),
-    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_pick,icon:const Icon(Icons.photo_library),label:const Text('OPEN PHOTO'))),const SizedBox(width:8),OutlinedButton(onPressed:()=>setState(() {_brightness=0;_contrast=1;_saturation=1;}),child:const Text('RESET')),const SizedBox(width:8),FilledButton.icon(onPressed:_photo==null?null:_export,icon:const Icon(Icons.save_alt),label:const Text('EXPORT'))])
+    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_pick,icon:const Icon(Icons.photo_library),label:const Text('OPEN PHOTO'))),const SizedBox(width:8),OutlinedButton(onPressed:()=>setState(() {_brightness=0;_contrast=1;_saturation=1;}),child:const Text('RESET')),const SizedBox(width:8),FilledButton.icon(onPressed:_photoBytes==null?null:_export,icon:const Icon(Icons.save_alt),label:const Text('EXPORT'))])
    ]))
   ])));
  Widget _control(String name,double value,double min,double max,ValueChanged<double> change)=>Row(children:[SizedBox(width:100,child:Text(name,style:const TextStyle(fontSize:10,color:Colors.white60))),Expanded(child:Slider(min:min,max:max,value:value.clamp(min,max),onChanged:change)),SizedBox(width:38,child:Text(value.toStringAsFixed(1),style:const TextStyle(fontSize:10)))]);

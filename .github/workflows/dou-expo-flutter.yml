@@ -20,6 +20,9 @@ jobs:
           channel: stable
       - name: Flutter version
         run: flutter --version
+      - name: Generate Android platform project
+        working-directory: dou_expo_beta
+        run: flutter create --platforms=android --project-name dou_expo_beta --org com.douexpo .
       - name: Resolve dependencies
         working-directory: dou_expo_beta
         run: flutter pub get

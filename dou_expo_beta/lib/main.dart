@@ -107,7 +107,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
-  var ri=0,si=0;const sizes=< (String,int) >[('Original size',0),('2048 px',2048),('4096 px',4096)];
+  var ri=0,si=0;var unit='px',cm=30.0,dpi=300,format='PNG';const sizes=< (String,int) >[('Original size',0),('2048 px',2048),('4096 px',4096)];
   await showModalBottomSheet<void>(context:context,backgroundColor:const Color(0xFF17171B),
    builder:(ctx)=>StatefulBuilder(builder:(ctx,ss)=>SafeArea(child:Padding(padding:const EdgeInsets.all(18),
     child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
@@ -115,18 +115,35 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      const SizedBox(height:12),const Text('Aspect ratio'),
      Wrap(spacing:6,children:List.generate(_ratios.length,(i)=>ChoiceChip(label:Text(_ratios[i].$1),
       selected:ri==i,onSelected:(_)=>ss(()=>ri=i)))),
-     const SizedBox(height:10),const Text('Maximum output dimension'),
-     DropdownButton<int>(value:sizes[si].$2,isExpanded:true,
+     const SizedBox(height:10),const Text('Output size unit'),
+     Wrap(spacing:6,children:[
+      ChoiceChip(label:const Text('Pixels'),selected:unit=='px',onSelected:(_)=>ss(()=>unit='px')),
+      ChoiceChip(label:const Text('Centimeters'),selected:unit=='cm',onSelected:(_)=>ss(()=>unit='cm')),
+     ]),
+     if(unit=='px') DropdownButton<int>(value:sizes[si].$2,isExpanded:true,
       items:sizes.map((x)=>DropdownMenuItem(value:x.$2,child:Text(x.$1))).toList(),
       onChanged:(v){if(v!=null)ss(()=>si=sizes.indexWhere((x)=>x.$2==v));}),
-     FilledButton.icon(onPressed:(){Navigator.pop(ctx);_save(_ratios[ri].$2,sizes[si].$2);},
-      icon:const Icon(Icons.file_download),label:const Text('EXPORT PNG'))
+     if(unit=='cm') ...[
+      Text('Long edge: ${cm.toStringAsFixed(1)} cm · ${(cm/2.54*dpi).round()} px'),
+      Slider(value:cm,min:5,max:60,divisions:55,onChanged:(v)=>ss(()=>cm=v)),
+      Row(children:[const Text('Print DPI'),const Spacer(),DropdownButton<int>(value:dpi,
+       items:const [72,150,300,600].map((v)=>DropdownMenuItem(value:v,child:Text('$v DPI'))).toList(),
+       onChanged:(v){if(v!=null)ss(()=>dpi=v);})]),
+     ],
+     const SizedBox(height:8),const Text('File format'),
+     Wrap(spacing:6,children:[
+      ChoiceChip(label:const Text('PNG · lossless'),selected:format=='PNG',onSelected:(_)=>ss(()=>format='PNG')),
+      ChoiceChip(label:const Text('JPEG · 95%'),selected:format=='JPEG',onSelected:(_)=>ss(()=>format='JPEG')),
+     ]),
+     FilledButton.icon(onPressed:(){final outputSize=unit=='cm'?(cm/2.54*dpi).round():sizes[si].$2;
+      Navigator.pop(ctx);_save(_ratios[ri].$2,outputSize,jpeg:format=='JPEG');},
+      icon:const Icon(Icons.file_download),label:Text('EXPORT $format'))
     ])))));
  }
- Future<void> _save(double ratio,int size) async {
+ Future<void> _save(double ratio,int size,{bool jpeg=false}) async {
   if(_busy)return;setState(()=>_busy=true);
-  try{final bytes=await _render(ratio,size);await Gal.putImageBytes(bytes,
-   name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString(),album:'Dou Expo');_toast('PNG saved to Gallery');}
+  try{var bytes=await _render(ratio,size);if(jpeg){final image=await ExposureComposer.decode(bytes);try{final data=await image.toByteData(format:ui.ImageByteFormat.jpeg,quality:95);if(data==null)throw StateError('JPEG encoding failed');bytes=data.buffer.asUint8List(data.offsetInBytes,data.lengthInBytes);}finally{image.dispose();}}await Gal.putImageBytes(bytes,
+   name:'dou_expo_'+DateTime.now().millisecondsSinceEpoch.toString(),album:'Dou Expo');_toast((jpeg?'JPEG':'PNG')+' saved to Gallery');}
   catch(e){_toast('Export failed: '+e.toString());}finally{if(mounted)setState(()=>_busy=false);}
  }
  Future<void> _share() async {

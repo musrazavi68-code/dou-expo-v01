@@ -155,8 +155,14 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      _maskStrokes..clear()..addAll(strokes);
     });
    }else{
-    if(nextBase!=null)setState((){_base?.dispose();_base=nextBase;_loadedBasePath=basePath;});
-    if(nextOverlay!=null)setState((){_overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;});
+    if(nextBase!=null||nextOverlay!=null||basePath==null||overlayPath==null){
+     setState((){
+      if(nextBase!=null){_base?.dispose();_base=nextBase;_loadedBasePath=basePath;}
+      if(nextOverlay!=null){_overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;}
+      if(basePath==null){_base?.dispose();_base=null;_loadedBasePath=null;}
+      if(overlayPath==null){_overlay?.dispose();_overlay=null;_loadedOverlayPath=null;}
+     });
+    }
    }
   }catch(error){if(mounted)_toast('Project restore failed: $error');}
  }

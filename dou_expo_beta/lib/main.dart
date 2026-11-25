@@ -36,7 +36,7 @@ class _DouExpoShellState extends State<DouExpoShell> with WidgetsBindingObserver
  int _index=0;
  late final ProjectSession _session;
  late final AutosaveCoordinator _autosave;
- @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);final now=DateTime.now().toUtc();_session=ProjectSession(initial:ProjectDocument(id:'dou-expo-main',name:'Dou Expo Project',createdAt:now,updatedAt:now,canvas:const {},layers:const []));_autosave=AutosaveCoordinator(session:_session,onError:(e,st)=>debugPrint('Autosave failed: $e'));}
+ @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);final now=DateTime.now().toUtc();_session=ProjectSession(initial:ProjectDocument(id:'dou-expo-main',name:'Dou Expo Project',createdAt:now,updatedAt:now,canvas:const {},layers:const []));_autosave=AutosaveCoordinator(session:_session,onError:(e,st)=>debugPrint('Autosave failed: $e'));_session.restoreCurrent().then((restored){if(restored)debugPrint('Dou Expo project restored');}).catchError((Object e,StackTrace st){debugPrint('Project restore failed: $e');});}
  @override void didChangeAppLifecycleState(AppLifecycleState s){if(s==AppLifecycleState.paused||s==AppLifecycleState.inactive){_autosave.flush().catchError((Object e,StackTrace st){debugPrint('Autosave flush failed: $e');});}}
  @override void dispose(){WidgetsBinding.instance.removeObserver(this);_autosave.dispose();_session.dispose();super.dispose();}
  @override Widget build(BuildContext context) {
@@ -47,17 +47,31 @@ class _DouExpoShellState extends State<DouExpoShell> with WidgetsBindingObserver
   ];
   return Scaffold(
    body:pages[_index],
-   bottomNavigationBar:NavigationBar(
-    backgroundColor:const Color(0xFF100D0C),
-    indicatorColor:const Color(0xFFFACC15).withValues(alpha:.18),
-    selectedIndex:_index,
-    onDestinationSelected:(v)=>setState(()=>_index=v),
-    destinations:const [
-     NavigationDestination(icon:Icon(Icons.camera_alt_outlined),selectedIcon:Icon(Icons.camera_alt),label:'ORDINARY'),
-     NavigationDestination(icon:Icon(Icons.layers_outlined),selectedIcon:Icon(Icons.layers),label:'DOUBLE'),
-     NavigationDestination(icon:Icon(Icons.tune),selectedIcon:Icon(Icons.tune),label:'DARKROOM'),
-    ],
-   ),
+   bottomNavigationBar:Column(mainAxisSize:MainAxisSize.min,children:[
+    AnimatedBuilder(animation:_session,builder:(context,_)=>Container(
+     height:42,color:const Color(0xFF100D0C),padding:const EdgeInsets.symmetric(horizontal:12),
+     child:Row(children:[
+      IconButton(tooltip:'Undo',onPressed:_session.canUndo?_session.undo:null,icon:const Icon(Icons.undo,size:19)),
+      IconButton(tooltip:'Redo',onPressed:_session.canRedo?_session.redo:null,icon:const Icon(Icons.redo,size:19)),
+      const SizedBox(width:8),
+      Expanded(child:Text(_session.isSaving?'SAVING…':_session.isDirty?'UNSAVED CHANGES':'PROJECT SAVED',
+       style:const TextStyle(fontSize:9,color:Colors.white54,letterSpacing:1))),
+      IconButton(tooltip:'Save project now',onPressed:()=>_autosave.flush().catchError((Object e,StackTrace st){debugPrint('Manual save failed: $e');}),
+       icon:const Icon(Icons.save_outlined,size:19)),
+     ]),
+    )),
+    NavigationBar(
+     backgroundColor:const Color(0xFF100D0C),
+     indicatorColor:const Color(0xFFFACC15).withValues(alpha:.18),
+     selectedIndex:_index,
+     onDestinationSelected:(v)=>setState(()=>_index=v),
+     destinations:const [
+      NavigationDestination(icon:Icon(Icons.camera_alt_outlined),selectedIcon:Icon(Icons.camera_alt),label:'ORDINARY'),
+      NavigationDestination(icon:Icon(Icons.layers_outlined),selectedIcon:Icon(Icons.layers),label:'DOUBLE'),
+      NavigationDestination(icon:Icon(Icons.tune),selectedIcon:Icon(Icons.tune),label:'DARKROOM'),
+     ],
+    ),
+   ]),
   );
  }
 }

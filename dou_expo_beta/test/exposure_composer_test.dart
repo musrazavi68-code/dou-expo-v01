@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:dou_expo_beta/exposure_composer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 Future<ui.Image> _solidImage(int width, int height, ui.Color color) async {
   final recorder = ui.PictureRecorder();

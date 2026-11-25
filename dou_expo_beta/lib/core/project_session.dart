@@ -1,12 +1,14 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import 'history_stack.dart';
 import 'project_document.dart';
 import 'project_store.dart';
 
 /// Shared project state used by all studio features. UI code publishes
 /// complete immutable snapshots; persistence and history stay centralized.
-class ProjectSession {
+class ProjectSession extends ChangeNotifier {
   ProjectSession._({
     required ProjectDocument initial,
     required Future<void> Function(ProjectDocument) persist,
@@ -36,7 +38,6 @@ class ProjectSession {
     );
   }
 
-  /// Backend injection keeps session behavior testable without platform IO.
   factory ProjectSession.withBackend({
     required ProjectDocument initial,
     required Future<void> Function(ProjectDocument) persist,
@@ -69,7 +70,6 @@ class ProjectSession {
   int get undoCount => _history.undoCount;
   int get revision => _revision;
 
-  /// Atomically publishes a complete immutable document snapshot.
   void replace(ProjectDocument next) {
     if (next.id != document.id) {
       throw ArgumentError('A session cannot be replaced with another project id');
@@ -82,6 +82,7 @@ class ProjectSession {
   void _markDirty() {
     _revision++;
     _dirty = true;
+    notifyListeners();
   }
 
   ProjectDocument? undo() {
@@ -114,9 +115,8 @@ class ProjectSession {
 
   Future<void> _saveUntilClean() async {
     _saving = true;
+    notifyListeners();
     try {
-      // Save once even for a pristine document so a newly-created project can
-      // be explicitly committed. Subsequent passes only happen for new edits.
       var firstPass = true;
       while (firstPass || _dirty) {
         firstPass = false;
@@ -125,27 +125,32 @@ class ProjectSession {
         await _persist(snapshot);
         if (_revision == revisionAtStart && identical(document, snapshot)) {
           _dirty = false;
+          notifyListeners();
         }
       }
     } finally {
       _saving = false;
+      notifyListeners();
     }
   }
 
   /// A slow read must not overwrite edits made while it was in flight.
-  /// Dirty state is saved first; if a new edit races the read, opening aborts.
   Future<bool> open(String id) async {
     if (id == document.id) return true;
     if (_dirty || _saving) await save();
     final revisionAtStart = _revision;
     final loaded = await _restore(id);
     if (loaded == null) return false;
+    if (loaded.id != id) {
+      throw FormatException('Restored project identifier does not match the requested id');
+    }
     if (_revision != revisionAtStart || _dirty || _saving) {
       throw StateError('Project changed while another project was loading');
     }
     _history.reset(loaded);
     _revision++;
     _dirty = false;
+    notifyListeners();
     return true;
   }
 }

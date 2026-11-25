@@ -418,7 +418,17 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final activeId=current.activeLayerId!=null&&remaining.any((layer)=>layer.id==current.activeLayerId)
    ?current.activeLayerId
    :(remaining.isEmpty?null:remaining.last.id);
-  setState(()=>_overlay=null);
+  final removedOverlay=_overlay;
+  setState((){
+   _overlay=null;
+   _loadedOverlayPath=null;
+   _maskStrokes.clear();
+   _activeMaskPath=null;
+   _offset=Offset.zero;
+   _scale=1;
+  });
+  // Release the native image handle when the second exposure is removed.
+  removedOverlay?.dispose();
   widget.session.replace(current.copyWith(layers:remaining,activeLayerId:activeId,clearActiveLayerId:activeId==null));
  }
  void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_contrast=1;_saturation=1;_filmEffect=FilmEffect.none;_effectAmount=.35;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;_maskStrokes.clear();_activeMaskPath=null;});}

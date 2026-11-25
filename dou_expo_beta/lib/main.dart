@@ -51,8 +51,10 @@ class _DouExpoShellState extends State<DouExpoShell> with WidgetsBindingObserver
     await entity.delete(recursive:true);removed++;
    }
   }
-  if(mounted)ScaffoldMessenger.of(context).showSnackBar(
-   SnackBar(content:Text(removed==0?'Temporary Dou Expo cache is already clear':'Cleared $removed temporary cache item(s)')));
+  if(mounted){
+   ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content:Text(removed==0?'Temporary Dou Expo cache is already clear':'Cleared $removed temporary cache item(s)')));
+  }
  }
  Future<void> _confirmClearHistory() async {
   final confirmed=await showDialog<bool>(context:context,builder:(dialogContext)=>AlertDialog(

@@ -69,6 +69,7 @@ class ExposureComposer {
     required Offset overlayOffset,
     required double overlayScale,
     required OverlayMaskMode maskMode,
+    double maskFeather = 0,
   }) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -91,16 +92,9 @@ class ExposureComposer {
         width: destination.width * overlayScale,
         height: destination.height * overlayScale,
       );
+      final mask = portraitMaskPath(size);
       if (maskMode != OverlayMaskMode.fullFrame) {
-        canvas.save();
-        final mask = portraitMaskPath(size);
-        canvas.clipPath(
-          mask,
-          doAntiAlias: true,
-          clipOp: maskMode == OverlayMaskMode.insidePortrait
-              ? ClipOp.intersect
-              : ClipOp.difference,
-        );
+        canvas.saveLayer(Offset.zero & size, Paint());
       }
       canvas.drawImageRect(
         overlay,
@@ -112,7 +106,20 @@ class ExposureComposer {
           ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
           ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
       );
-      if (maskMode != OverlayMaskMode.fullFrame) canvas.restore();
+      if (maskMode != OverlayMaskMode.fullFrame) {
+        canvas.drawPath(
+          mask,
+          Paint()
+            ..color = const Color(0xFFFFFFFF)
+            ..blendMode = maskMode == OverlayMaskMode.insidePortrait
+                ? BlendMode.dstIn
+                : BlendMode.dstOut
+            ..maskFilter = maskFeather > 0
+                ? MaskFilter.blur(BlurStyle.normal, maskFeather)
+                : null,
+        );
+        canvas.restore();
+      }
     }
     canvas.restore();
   }
@@ -129,6 +136,7 @@ class ExposureComposer {
     required Offset overlayOffset,
     required double overlayScale,
     required OverlayMaskMode maskMode,
+    double maskFeather = 0,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -144,6 +152,7 @@ class ExposureComposer {
       overlayOffset: overlayOffset,
       overlayScale: overlayScale,
       maskMode: maskMode,
+      maskFeather: maskFeather,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
@@ -169,6 +178,7 @@ class ExposurePreviewPainter extends CustomPainter {
     required this.overlayOffset,
     required this.overlayScale,
     required this.maskMode,
+    this.maskFeather = 0,
   });
 
   final ui.Image? base;
@@ -180,6 +190,7 @@ class ExposurePreviewPainter extends CustomPainter {
   final Offset overlayOffset;
   final double overlayScale;
   final OverlayMaskMode maskMode;
+  final double maskFeather;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -198,6 +209,7 @@ class ExposurePreviewPainter extends CustomPainter {
       overlayOffset: overlayOffset,
       overlayScale: overlayScale,
       maskMode: maskMode,
+      maskFeather: maskFeather,
     );
   }
 
@@ -211,5 +223,6 @@ class ExposurePreviewPainter extends CustomPainter {
       old.overlayEv != overlayEv ||
       old.overlayOffset != overlayOffset ||
       old.overlayScale != overlayScale ||
-      old.maskMode != maskMode;
+      old.maskMode != maskMode ||
+      old.maskFeather != maskFeather;
 }

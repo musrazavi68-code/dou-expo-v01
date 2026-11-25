@@ -37,6 +37,27 @@ void main() {
     autosave.dispose();
   });
 
+  test('session revision changes schedule autosave without feature callbacks', () async {
+    var saves = 0;
+    final session = ProjectSession.withBackend(
+      initial: _document('Initial'),
+      persist: (_) async { saves++; },
+      restore: (_) async => null,
+      writeAsset: (_, __, ___) async => 'assets/test.png',
+    );
+    final autosave = AutosaveCoordinator(
+      session: session,
+      debounce: const Duration(milliseconds: 15),
+    );
+
+    session.replace(_document('Changed'));
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+
+    expect(saves, 1);
+    expect(session.isDirty, isFalse);
+    autosave.dispose();
+  });
+
   test('flush cancels pending debounce and persists immediately', () async {
     var saves = 0;
     final session = ProjectSession.withBackend(

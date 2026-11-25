@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Real two-image compositor. The second exposure is painted with a true
 /// Porter-Duff blend mode; it is not a decorative gradient overlay.

@@ -41,7 +41,7 @@ class _DouExpoShellState extends State<DouExpoShell> {
    body:pages[_index],
    bottomNavigationBar:NavigationBar(
     backgroundColor:const Color(0xFF100D0C),
-    indicatorColor:const Color(0xFFFACC15).withOpacity(.18),
+    indicatorColor:const Color(0xFFFACC15).withValues(alpha:.18),
     selectedIndex:_index,
     onDestinationSelected:(v)=>setState(()=>_index=v),
     destinations:const [
@@ -336,7 +336,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      Row(children:[
       const SizedBox(width:105,child:Text('SUGGESTED COLOR',style:TextStyle(fontSize:9,color:Colors.white60))),
       Container(width:25,height:25,decoration:BoxDecoration(color:_stencilTint,shape:BoxShape.circle,border:Border.all(color:Colors.white54))),
-      const SizedBox(width:8),Text('#'+_stencilTint.value.toRadixString(16).substring(2).toUpperCase()),
+      const SizedBox(width:8),Text('#'+_stencilTint.toARGB32().toRadixString(16).substring(2).toUpperCase()),
       const Spacer(),TextButton(onPressed:()=>setState(()=>_stencilTint=Colors.white),child:const Text('SET WHITE')),
      ]),
     Row(children:[

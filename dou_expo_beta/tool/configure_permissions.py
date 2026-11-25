@@ -2,7 +2,6 @@
 """Apply camera/gallery permissions and minimum platform versions to generated Flutter projects."""
 from pathlib import Path
 import plistlib
-import re
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
@@ -27,8 +26,8 @@ for build_file in (
 ):
     if build_file.exists():
         source = build_file.read_text()
-        source = re.sub(r"minSdk\\s*=\\s*flutter\\.minSdkVersion", "minSdk = 24", source)
-        source = re.sub(r"minSdkVersion\\s+flutter\\.minSdkVersion", "minSdkVersion 24", source)
+        source = source.replace("minSdk = flutter.minSdkVersion", "minSdk = 24")
+        source = source.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 24")
         build_file.write_text(source)
 
 info = root / "ios/Runner/Info.plist"
@@ -45,7 +44,7 @@ if info.exists():
 podfile = root / "ios/Podfile"
 if podfile.exists():
     source = podfile.read_text()
-    source = re.sub(r"^#\\s*platform :ios,.*$", "platform :ios, '13.0'", source, count=1, flags=re.MULTILINE)
-    if not re.search(r"^platform :ios,", source, flags=re.MULTILINE):
-        source = "platform :ios, '13.0'\\n" + source
+    source = source.replace("# platform :ios, '13.0'", "platform :ios, '13.0'")
+    if "platform :ios," not in source:
+        source = "platform :ios, '13.0'\n" + source
     podfile.write_text(source)

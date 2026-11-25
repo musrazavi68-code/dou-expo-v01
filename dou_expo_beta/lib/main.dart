@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -15,6 +16,7 @@ import 'studio_modes.dart';
 import 'core/project_document.dart';
 import 'core/project_session.dart';
 import 'core/autosave_coordinator.dart';
+import 'core/project_store.dart';
 
 void main() {
  WidgetsFlutterBinding.ensureInitialized();
@@ -141,6 +143,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    final stamp=DateTime.now().microsecondsSinceEpoch;
    final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
    final layerId=second?'overlay_$stamp':'base_$stamp';
+   if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    final current=widget.session.document;
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],

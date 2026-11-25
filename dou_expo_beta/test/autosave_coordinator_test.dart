@@ -19,7 +19,7 @@ void main() {
       initial: _document('Initial'),
       persist: (doc) async { saved.add(doc.name); },
       restore: (_) async => null,
-      writeAsset: (_, __, ___) async => 'assets/test.png',
+      writeAsset: (_, _, _) async => 'assets/test.png',
     );
     final autosave = AutosaveCoordinator(
       session: session,
@@ -43,7 +43,7 @@ void main() {
       initial: _document('Initial'),
       persist: (_) async { saves++; },
       restore: (_) async => null,
-      writeAsset: (_, __, ___) async => 'assets/test.png',
+      writeAsset: (_, _, _) async => 'assets/test.png',
     );
     final autosave = AutosaveCoordinator(
       session: session,
@@ -64,7 +64,7 @@ void main() {
       initial: _document('Initial'),
       persist: (_) async { saves++; },
       restore: (_) async => null,
-      writeAsset: (_, __, ___) async => 'assets/test.png',
+      writeAsset: (_, _, _) async => 'assets/test.png',
     );
     final autosave = AutosaveCoordinator(
       session: session,
@@ -91,7 +91,7 @@ void main() {
         if (attempts == 1) throw StateError('disk full');
       },
       restore: (_) async => null,
-      writeAsset: (_, __, ___) async => 'assets/test.png',
+      writeAsset: (_, _, _) async => 'assets/test.png',
     );
     final autosave = AutosaveCoordinator(
       session: session,

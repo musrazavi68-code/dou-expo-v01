@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:gal/gal.dart';
@@ -22,6 +23,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  double _ev=0,_zoom=1,_maxZoom=4;
  String _film='COLOR';
  XFile? _lastShot;
+ Uint8List? _lastShotBytes;
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_init();}
  @override void dispose(){WidgetsBinding.instance.removeObserver(this);_camera?.dispose();super.dispose();}
  @override void didChangeAppLifecycleState(AppLifecycleState state){
@@ -75,7 +77,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    final developed=await _applyFilm(await File(shot.path).readAsBytes(),_film);
    await Gal.putImageBytes(developed,name:'ordinary_'+DateTime.now().millisecondsSinceEpoch.toString()+'.jpg',album:'Dou Expo');
    if(mounted){
-    setState(()=>_lastShot=XFile(shot.path));
+    setState(()=>{_lastShot=XFile(shot.path),_lastShotBytes=developed});
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Saved $_film · one exposure')));
    }
   }catch(e){
@@ -112,7 +114,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
     const Text('Focus point: tap the viewfinder · ISO and shutter speed depend on native camera support',style:TextStyle(fontSize:10,color:Colors.white54)),
    ])),
    Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
-    GestureDetector(onTap:()=>_lastShot==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.file(File(_lastShot!.path)))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShot==null?null:DecorationImage(image:FileImage(File(_lastShot!.path)),fit:BoxFit.cover)),child:_lastShot==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),
+    GestureDetector(onTap:()=>_lastShot==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.memory(_lastShotBytes!,fit:BoxFit.contain))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShotBytes==null?null:DecorationImage(image:MemoryImage(_lastShotBytes!),fit:BoxFit.cover)),child:_lastShot==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),
     GestureDetector(onTap:_capture,child:Container(width:86,height:86,decoration:const BoxDecoration(color:Colors.white,shape:BoxShape.circle),child:Center(child:_busy?const CircularProgressIndicator(color:_ink):const Icon(Icons.add,size:38,color:_ink)))),
     Column(children:[const Text('FILM / TIMER',style:TextStyle(fontSize:9,color:Colors.white54)),DropdownButton<String>(value:_film,dropdownColor:_ink,underline:const SizedBox(),items:const ['COLOR','MONO','WARM','COOL'].map((x)=>DropdownMenuItem(value:x,child:Text(x,style:const TextStyle(fontSize:11)))).toList(),onChanged:(v){if(v!=null)setState(()=>_film=v);}),DropdownButton<int>(value:_timerSeconds,dropdownColor:_ink,underline:const SizedBox(),items:const [0,3,5,10].map((v)=>DropdownMenuItem(value:v,child:Text(v==0?'OFF':'${v}s',style:const TextStyle(fontSize:10)))).toList(),onChanged:(v){if(v!=null)setState(()=>_timerSeconds=v);})])
    ]))

@@ -54,8 +54,27 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  String _film='COLOR';
  XFile? _lastShot;
  Uint8List? _lastShotBytes;
- @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_init();}
- @override void dispose(){WidgetsBinding.instance.removeObserver(this);_camera?.dispose();super.dispose();}
+ String? _loadedOrdinaryPath;int _restoreToken=0;
+ @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);widget.session.addListener(_onProjectChanged);_restoreOrdinary();_init();}
+ @override void dispose(){widget.session.removeListener(_onProjectChanged);_restoreToken++;WidgetsBinding.instance.removeObserver(this);_camera?.dispose();super.dispose();}
+ void _onProjectChanged(){_restoreOrdinary();}
+ Future<void> _restoreOrdinary() async {
+  final token=++_restoreToken;final project=widget.session.document;
+  final layers=project.layers.where((v)=>v.name.startsWith('Ordinary camera')).toList();
+  final layer=layers.isEmpty?null:layers.last;final path=layer?.assetPath;
+  try{
+   Uint8List? bytes;
+   if(path!=null&&path!=_loadedOrdinaryPath){final file=await ProjectStore().resolveAsset(project.id,path);bytes=await file.readAsBytes();}
+   if(token!=_restoreToken||!mounted)return;
+   setState((){
+    if(path==null){_lastShotBytes=null;_lastShot=null;_loadedOrdinaryPath=null;}
+    else{
+     if(bytes!=null){_lastShotBytes=bytes;_loadedOrdinaryPath=path;_lastShot=null;}
+     final film=layer?.settings['film'];if(film is String)_film=film;
+    }
+   });
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Camera project restore failed: $e')));}
+ }
  @override void didChangeAppLifecycleState(AppLifecycleState state){
   if(state==AppLifecycleState.inactive||state==AppLifecycleState.paused){_appActive=false;final c=_camera;_camera=null;_ready=false;c?.dispose();if(mounted)setState((){});}
   if(state==AppLifecycleState.resumed){_appActive=true;_init();}
@@ -97,6 +116,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    final assetPath=await widget.session.addAsset('ordinary_$stamp.jpg',sourceBytes);
    final current=widget.session.document;
    final layerId='ordinary_$stamp';
+   _loadedOrdinaryPath=assetPath;
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:'Ordinary camera · $_film',assetPath:assetPath,settings:{'mode':'ordinary','film':_film,'singleExposure':true})],
     activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'ordinaryCamera'}));
@@ -141,7 +161,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
     const Text('Exposure compensation and tap-to-focus · ISO and shutter are not yet exposed by this camera driver',style:TextStyle(fontSize:10,color:Colors.white54)),
    ])),
    Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
-    GestureDetector(onTap:()=>_lastShot==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.memory(_lastShotBytes!,fit:BoxFit.contain))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShotBytes==null?null:DecorationImage(image:MemoryImage(_lastShotBytes!),fit:BoxFit.cover)),child:_lastShot==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),
+    GestureDetector(onTap:()=>_lastShotBytes==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.memory(_lastShotBytes!,fit:BoxFit.contain))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShotBytes==null?null:DecorationImage(image:MemoryImage(_lastShotBytes!),fit:BoxFit.cover)),child:_lastShotBytes==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),
     GestureDetector(onTap:_capture,child:Container(width:86,height:86,decoration:const BoxDecoration(color:Colors.white,shape:BoxShape.circle),child:Center(child:_busy?const CircularProgressIndicator(color:_ink):const Icon(Icons.add,size:38,color:_ink)))),
     Column(children:[const Text('FILM / TIMER',style:TextStyle(fontSize:9,color:Colors.white54)),DropdownButton<String>(value:_film,dropdownColor:_ink,underline:const SizedBox(),items:const ['COLOR','MONO','WARM','COOL'].map((x)=>DropdownMenuItem(value:x,child:Text(x,style:const TextStyle(fontSize:11)))).toList(),onChanged:(v){if(v!=null)setState(()=>_film=v);}),DropdownButton<int>(value:_timerSeconds,dropdownColor:_ink,underline:const SizedBox(),items:const [0,3,5,10].map((v)=>DropdownMenuItem(value:v,child:Text(v==0?'OFF':'${v}s',style:const TextStyle(fontSize:10)))).toList(),onChanged:(v){if(v!=null)setState(()=>_timerSeconds=v);})])
    ]))

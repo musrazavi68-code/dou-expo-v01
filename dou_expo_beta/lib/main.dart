@@ -412,6 +412,15 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     trailing:_blend==i?const Icon(Icons.check,color:Color(0xFFFACC15)):null,
     onTap:(){setState(()=>_blend=i);Navigator.pop(ctx);})
   ])));}
+ void _removeSecondExposure(){
+  final current=widget.session.document;
+  final remaining=current.layers.where((layer)=>layer.name!='Second exposure').toList(growable:false);
+  final activeId=current.activeLayerId!=null&&remaining.any((layer)=>layer.id==current.activeLayerId)
+   ?current.activeLayerId
+   :(remaining.isEmpty?null:remaining.last.id);
+  setState(()=>_overlay=null);
+  widget.session.replace(current.copyWith(layers:remaining,activeLayerId:activeId,clearActiveLayerId:activeId==null));
+ }
  void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_contrast=1;_saturation=1;_filmEffect=FilmEffect.none;_effectAmount=.35;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;_maskStrokes.clear();_activeMaskPath=null;});}
  @override Widget build(BuildContext context)=>Scaffold(
   appBar:AppBar(title:const Text('DOU EXPO',style:TextStyle(letterSpacing:2,fontWeight:FontWeight.bold)),
@@ -601,7 +610,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      _slider('EFFECT AMOUNT',_effectAmount,(v)=>setState(()=>_effectAmount=v)),
     Row(children:[Expanded(child:Text('MODE: '+_modes[_blend].$1,style:const TextStyle(fontSize:9,color:Colors.white60))),
      TextButton(onPressed:_reset,child:const Text('RESET')),
-     TextButton(onPressed:(){setState((){_overlay?.dispose();_overlay=null;});},child:const Text('REMOVE 2ND'))])
+     TextButton(onPressed:_removeSecondExposure,child:const Text('REMOVE 2ND'))])
    ]else const Padding(padding:EdgeInsets.all(10),child:Text('PATTERN / 2ND PHOTO adds the second exposure image',
     style:TextStyle(fontSize:10,color:Colors.white54))),
    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_base==null?null:_export,icon:const Icon(Icons.file_download),

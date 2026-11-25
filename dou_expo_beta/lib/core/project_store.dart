@@ -110,8 +110,10 @@ class ProjectStore {
     final dir = Directory('${root.path}/$id');
     if (!await dir.exists()) return null;
     final file = File('${dir.path}/project.json');
-    if (!await file.exists()) return null;
-    final project = ProjectDocument.decode(await file.readAsString());
+    final backup = File('${dir.path}/project.json.bak');
+    final source = await file.exists() ? file : (await backup.exists() ? backup : null);
+    if (source == null) return null;
+    final project = ProjectDocument.decode(await source.readAsString());
     if (project.id != id) {
       throw FormatException('Project manifest identifier does not match its directory');
     }

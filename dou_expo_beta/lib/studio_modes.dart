@@ -46,29 +46,30 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  bool _ready=false,_manual=false,_busy=false;
  int _timerSeconds=0,_countdown=0;
  double _ev=0,_minEv=-2,_maxEv=2,_zoom=1,_maxZoom=4;
- bool _cameraInitializing=false;
+ bool _cameraInitializing=false,_appActive=true;
  String _film='COLOR';
  XFile? _lastShot;
  Uint8List? _lastShotBytes;
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_init();}
  @override void dispose(){WidgetsBinding.instance.removeObserver(this);_camera?.dispose();super.dispose();}
  @override void didChangeAppLifecycleState(AppLifecycleState state){
-  if(state==AppLifecycleState.inactive||state==AppLifecycleState.paused){final c=_camera;_camera=null;_ready=false;c?.dispose();if(mounted)setState((){});}
-  if(state==AppLifecycleState.resumed)_init();
+  if(state==AppLifecycleState.inactive||state==AppLifecycleState.paused){_appActive=false;final c=_camera;_camera=null;_ready=false;c?.dispose();if(mounted)setState((){});}
+  if(state==AppLifecycleState.resumed){_appActive=true;_init();}
  }
  Future<void> _init() async {
-  if(_cameraInitializing||_camera!=null)return;
+  if(!_appActive||_cameraInitializing||_camera!=null)return;
   _cameraInitializing=true;
+  CameraController? candidate;
   try{
    _available=await availableCameras();if(_available.isEmpty)return;
    final back=_available.where((x)=>x.lensDirection==CameraLensDirection.back).toList();
    final selected=back.isNotEmpty?back.first:_available.first;
-   final c=CameraController(selected,ResolutionPreset.high,enableAudio:false);
-   await c.initialize();final z=await c.getMaxZoomLevel();
-   final minEv=await c.getMinExposureOffset();final maxEv=await c.getMaxExposureOffset();
-   if(!mounted){await c.dispose();return;}
-   setState(() {_camera=c;_ready=true;_maxZoom=z;_minEv=minEv;_maxEv=maxEv;_ev=0;_zoom=1;});
-  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Camera unavailable: $e')));}
+   candidate=CameraController(selected,ResolutionPreset.high,enableAudio:false);
+   await candidate!.initialize();final z=await candidate!.getMaxZoomLevel();
+   final minEv=await candidate!.getMinExposureOffset();final maxEv=await candidate!.getMaxExposureOffset();
+   if(!mounted||!_appActive){await candidate!.dispose();return;}
+   setState(() {_camera=candidate;_ready=true;_maxZoom=z;_minEv=minEv;_maxEv=maxEv;_ev=0;_zoom=1;});
+  }catch(e){await candidate?.dispose();if(mounted&&_appActive)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Camera unavailable: $e')));}
   finally{_cameraInitializing=false;}
  }
  Future<void> _setEv(double v) async {final c=_camera;if(c==null)return;try{final a=await c.setExposureOffset(v);if(mounted)setState(()=>_ev=a);}catch(_){}}
@@ -97,11 +98,13 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
   }finally{if(mounted)setState(()=>{_busy=false,_countdown=0});}
  }
  Future<void> _flip() async {
-  if(_available.length<2)return;final old=_camera;_camera=null;_ready=false;await old?.dispose();
+  if(_available.length<2||_cameraInitializing||!_appActive)return;_cameraInitializing=true;final old=_camera;_camera=null;_ready=false;await old?.dispose();
   final current=_available.indexWhere((x)=>x.lensDirection==old?.description.lensDirection);
   final next=_available[(current+1)%_available.length];
-  try{final c=CameraController(next,ResolutionPreset.high,enableAudio:false);await c.initialize();if(!mounted){await c.dispose();return;}setState(() {_camera=c;_ready=true;});}
-  catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Lens switch failed: $e')));}
+  CameraController? candidate;
+  try{candidate=CameraController(next,ResolutionPreset.high,enableAudio:false);await candidate.initialize();if(!mounted||!_appActive){await candidate.dispose();return;}setState(() {_camera=candidate;_ready=true;});}
+  catch(e){await candidate?.dispose();if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Lens switch failed: $e')));}
+  finally{_cameraInitializing=false;}
  }
  @override Widget build(BuildContext context)=>Scaffold(
   backgroundColor:_ink,

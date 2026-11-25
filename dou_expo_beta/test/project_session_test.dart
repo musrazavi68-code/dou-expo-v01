@@ -37,11 +37,15 @@ void main() {
     expect(session.document.name, 'Edited');
   });
 
-  test('save does not clear dirty flag when a newer edit occurs during IO', () async {
+  test('save persists a newer edit that occurs while IO is in progress', () async {
     final gate = Completer<void>();
+    final saved = <String>[];
     final session = ProjectSession.withBackend(
       initial: doc('Initial'),
-      persist: (_) => gate.future,
+      persist: (value) async {
+        saved.add(value.name);
+        if (saved.length == 1) await gate.future;
+      },
       restore: (_) async => null,
       writeAsset: (_, __, ___) async => 'assets/test.png',
     );
@@ -54,8 +58,9 @@ void main() {
     await saving;
 
     expect(session.isSaving, isFalse);
-    expect(session.isDirty, isTrue);
+    expect(session.isDirty, isFalse);
     expect(session.document.name, 'Edit while saving');
+    expect(saved, ['First edit', 'Edit while saving']);
   });
 
   test('save clears dirty flag only after persisted snapshot completes', () async {
@@ -103,3 +108,4 @@ void main() {
     expect(receivedId, 'session-test');
   });
 }
+

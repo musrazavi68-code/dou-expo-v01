@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:gal/gal.dart';
@@ -90,6 +92,37 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
  final _picker=ImagePicker();XFile? _photo;
  double _brightness=0,_contrast=1,_saturation=1;
  Future<void> _pick() async {final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);if(x!=null&&mounted)setState(()=>_photo=x);}
+ Future<void> _export() async {
+  final photo=_photo;
+  if(photo==null)return;
+  try{
+   final codec=await ui.instantiateImageCodec(await photo.readAsBytes());
+   final frame=await codec.getNextFrame();
+   final source=frame.image;
+   codec.dispose();
+   try{
+    final recorder=ui.PictureRecorder();
+    final canvas=Canvas(recorder);
+    final paint=Paint()
+      ..filterQuality=FilterQuality.high
+      ..colorFilter=ColorFilter.matrix(_matrix());
+    canvas.drawImageRect(source,Rect.fromLTWH(0,0,source.width.toDouble(),source.height.toDouble()),
+      Rect.fromLTWH(0,0,source.width.toDouble(),source.height.toDouble()),paint);
+    final picture=recorder.endRecording();
+    final output=await picture.toImage(source.width,source.height);
+    picture.dispose();
+    try{
+     final data=await output.toByteData(format:ui.ImageByteFormat.png);
+     if(data==null)throw StateError('Could not encode developed photo');
+     final bytes=data.buffer.asUint8List(data.offsetInBytes,data.lengthInBytes);
+     await Gal.putImageBytes(bytes,name:'darkroom_'+DateTime.now().millisecondsSinceEpoch.toString()+'.png',album:'Dou Expo');
+     if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Developed PNG saved to Gallery')));
+    }finally{output.dispose();}
+   }finally{source.dispose();}
+  }catch(e){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Darkroom export failed: '+e.toString())));
+  }
+ }
  List<double> _matrix(){
   final c=_contrast,s=_saturation,b=_brightness*255;
   final r=(.213+.787*s)*c,g=(.715-.715*s)*c,bl=(.072-.072*s)*c;
@@ -103,7 +136,7 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
     _control('BRIGHTNESS',_brightness,-1,1,(v)=>setState(()=>_brightness=v)),
     _control('CONTRAST',_contrast,0,2,(v)=>setState(()=>_contrast=v)),
     _control('SATURATION',_saturation,0,2,(v)=>setState(()=>_saturation=v)),
-    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_pick,icon:const Icon(Icons.photo_library),label:const Text('OPEN PHOTO'))),const SizedBox(width:10),OutlinedButton(onPressed:()=>setState(() {_brightness=0;_contrast=1;_saturation=1;}),child:const Text('RESET'))])
+    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_pick,icon:const Icon(Icons.photo_library),label:const Text('OPEN PHOTO'))),const SizedBox(width:8),OutlinedButton(onPressed:()=>setState(() {_brightness=0;_contrast=1;_saturation=1;}),child:const Text('RESET')),const SizedBox(width:8),FilledButton.icon(onPressed:_photo==null?null:_export,icon:const Icon(Icons.save_alt),label:const Text('EXPORT'))])
    ]))
   ])));
  Widget _control(String name,double value,double min,double max,ValueChanged<double> change)=>Row(children:[SizedBox(width:100,child:Text(name,style:const TextStyle(fontSize:10,color:Colors.white60))),Expanded(child:Slider(min:min,max:max,value:value.clamp(min,max),onChanged:change)),SizedBox(width:38,child:Text(value.toStringAsFixed(1),style:const TextStyle(fontSize:10)))]);

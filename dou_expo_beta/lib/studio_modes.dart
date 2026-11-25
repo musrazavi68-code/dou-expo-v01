@@ -90,7 +90,15 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    }
    if(!mounted)return;
    final shot=await c.takePicture();
-   final developed=await _applyFilm(await File(shot.path).readAsBytes(),_film);
+   final sourceBytes=await File(shot.path).readAsBytes();
+   final developed=await _applyFilm(sourceBytes,_film);
+   final stamp=DateTime.now().microsecondsSinceEpoch;
+   final assetPath=await widget.session.addAsset('ordinary_$stamp.jpg',sourceBytes);
+   final current=widget.session.document;
+   final layerId='ordinary_$stamp';
+   widget.session.replace(current.copyWith(
+    layers:[...current.layers,LayerDocument(id:layerId,name:'Ordinary camera · $_film',assetPath:assetPath,settings:{'mode':'ordinary','film':_film,'singleExposure':true})],
+    activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'ordinaryCamera'}));
    await Gal.putImageBytes(developed,name:'ordinary_'+DateTime.now().millisecondsSinceEpoch.toString()+'.jpg',album:'Dou Expo');
    if(mounted){
     setState(() { _lastShot = XFile(shot.path); _lastShotBytes = developed; });
@@ -148,7 +156,21 @@ class DarkroomScreen extends StatefulWidget {
 class _DarkroomScreenState extends State<DarkroomScreen> {
  final _picker=ImagePicker();XFile? _photo;
  double _brightness=0,_contrast=1,_saturation=1;
- Future<void> _pick() async {final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);if(x!=null&&mounted)setState(()=>_photo=x);}
+ Future<void> _pick() async {
+  final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);
+  if(x==null)return;
+  try{
+   final bytes=await x.readAsBytes();
+   final stamp=DateTime.now().microsecondsSinceEpoch;
+   final assetPath=await widget.session.addAsset('darkroom_$stamp.jpg',bytes);
+   final current=widget.session.document;
+   final layerId='darkroom_$stamp';
+   widget.session.replace(current.copyWith(
+    layers:[...current.layers,LayerDocument(id:layerId,name:'Darkroom source',assetPath:assetPath,settings:{'mode':'darkroom'})],
+    activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'darkroom'}));
+   if(mounted)setState(()=>_photo=x);
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Project import failed: $e')));}
+ }
  Future<void> _export() async {
   final photo=_photo;
   if(photo==null)return;

@@ -35,6 +35,10 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  bool _cameraOpen=false,_cameraReady=false,_busy=false;
  double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1;
  Offset _offset=Offset.zero;
+ final List<MaskStroke> _maskStrokes=[];
+ Path? _activeMaskPath;
+ bool _maskEdit=false,_eraseBrush=false;
+ double _brushSize=.035,_maskFeather=0;
  int _blend=0,_cameraIndex=0;
  OverlayMaskMode _maskMode=OverlayMaskMode.fullFrame;
  static const _modes=< (String,BlendMode) >[
@@ -93,7 +97,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final h=(r>=1?math.max(1,(side/r).round()):side).toInt();
   return ExposureComposer.renderPng(base:b,overlay:_overlay,width:w,height:h,
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode);
+   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes);
  }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
@@ -133,7 +137,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     trailing:_blend==i?const Icon(Icons.check,color:Color(0xFFFACC15)):null,
     onTap:(){setState(()=>_blend=i);Navigator.pop(ctx);})
   ])));}
- void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;});}
+ void _reset(){setState((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;_maskStrokes.clear();_activeMaskPath=null;});}
  @override Widget build(BuildContext context)=>Scaffold(
   appBar:AppBar(title:const Text('DOU EXPO',style:TextStyle(letterSpacing:2,fontWeight:FontWeight.bold)),
    actions:[IconButton(tooltip:'Export dimensions',onPressed:_export,icon:const Icon(Icons.ios_share)),
@@ -147,12 +151,21 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final b=_base;
   return Column(children:[Expanded(child:Padding(padding:const EdgeInsets.all(12),
    child:ClipRRect(borderRadius:BorderRadius.circular(18),child:GestureDetector(
-    onDoubleTap:_reset,onScaleUpdate:(d){if(_overlay==null)return;setState((){
+    onDoubleTap:_reset,
+    onPanStart:_maskEdit&&_overlay!=null?(d){setState((){
+      _activeMaskPath=Path()..moveTo(d.localPosition.dx/400,d.localPosition.dy/600);
+      _maskStrokes.add(MaskStroke(path:_activeMaskPath!,width:_brushSize,erase:_eraseBrush));
+    });}:null,
+    onPanUpdate:_maskEdit&&_overlay!=null?(d){setState((){
+      _activeMaskPath?.lineTo(d.localPosition.dx/400,d.localPosition.dy/600);
+    });}:null,
+    onPanEnd:_maskEdit?(_){_activeMaskPath=null;}:null,
+    onScaleUpdate:(d){if(_overlay==null||_maskEdit)return;setState((){
      _scale=(_scale*d.scale).clamp(.2,5).toDouble();_offset+=Offset(d.focalPointDelta.dx/400,d.focalPointDelta.dy/600);
     });},
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode),
+     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes),
      child:_cameraOpen && _cameraReady && _camera!=null
       ? CameraPreview(_camera!)
       :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -199,10 +212,20 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
        onSelected:(_)=>setState(()=>_maskMode=OverlayMaskMode.outsidePortrait)),
      ]))
     ]),
+    Row(children:[
+     const SizedBox(width:105,child:Text('MASK EDIT',style:TextStyle(fontSize:9,color:Colors.white60))),
+     Expanded(child:SwitchListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text(_maskEdit?'Brush active':'Edit mask'),value:_maskEdit,onChanged:(v)=>setState(()=>_maskEdit=v))),
+     IconButton(tooltip:'Undo mask stroke',onPressed:_maskStrokes.isEmpty?null:()=>setState(()=>_maskStrokes.removeLast()),icon:const Icon(Icons.undo,size:18)),
+     IconButton(tooltip:'Clear mask strokes',onPressed:_maskStrokes.isEmpty?null:()=>setState(()=>_maskStrokes.clear()),icon:const Icon(Icons.delete_outline,size:18)),
+    ]),
+    Row(children:[
+     Expanded(child:TextButton(onPressed:()=>setState(()=>_eraseBrush=false),child:Text('BRUSH',style:TextStyle(color:_eraseBrush?Colors.white54:const Color(0xFFFACC15))))),
+     Expanded(child:TextButton(onPressed:()=>setState(()=>_eraseBrush=true),child:Text('ERASER',style:TextStyle(color:_eraseBrush?const Color(0xFFFACC15):Colors.white54)))),
+    ]),
+    _slider('BRUSH SIZE',_brushSize/.12,(v)=>setState(()=>_brushSize=v*.12),text:(_brushSize*100).round().toString()+'%'),
+    _slider('EDGE FEATHER',_maskFeather,(v)=>setState(()=>_maskFeather=v)),
     if(_maskMode!=OverlayMaskMode.fullFrame)
-     const Padding(padding:EdgeInsets.only(bottom:4),child:Text(
-      'Portrait silhouette mask · affects only image two; base photo remains unchanged',
-      style:TextStyle(fontSize:9,color:Colors.white54))),
+     const Padding(padding:EdgeInsets.only(bottom:4),child:Text('Portrait silhouette mask · brush to reveal or erase image two · undo supported',style:TextStyle(fontSize:9,color:Colors.white54))),
     Row(children:[Expanded(child:Text('MODE: '+_modes[_blend].$1,style:const TextStyle(fontSize:9,color:Colors.white60))),
      TextButton(onPressed:_reset,child:const Text('RESET')),
      TextButton(onPressed:(){setState((){_overlay?.dispose();_overlay=null;});},child:const Text('REMOVE 2ND'))])

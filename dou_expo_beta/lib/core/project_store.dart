@@ -51,8 +51,25 @@ class ProjectStore {
     final target = File('${dir.path}/project.json');
     final temporary = File('${dir.path}/project.json.tmp');
     await temporary.writeAsString(document.encode(), flush: true);
-    if (await target.exists()) await target.delete();
-    await temporary.rename(target.path);
+    // Rename the fully flushed temporary file over the previous manifest.
+    // Keep the previous manifest intact if writing the new one fails.
+    try {
+      await temporary.rename(target.path);
+    } on FileSystemException {
+      // Some filesystems do not replace an existing destination on rename.
+      final backup = File('${dir.path}/project.json.bak');
+      if (await backup.exists()) await backup.delete();
+      if (await target.exists()) await target.rename(backup.path);
+      try {
+        await temporary.rename(target.path);
+        if (await backup.exists()) await backup.delete();
+      } catch (_) {
+        if (await backup.exists() && !await target.exists()) {
+          await backup.rename(target.path);
+        }
+        rethrow;
+      }
+    }
   }
 
   Future<ProjectDocument?> load(String id) async {

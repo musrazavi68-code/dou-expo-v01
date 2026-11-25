@@ -123,8 +123,11 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
   Future<void> _initCameras() async {
     try {
       _cameras = await availableCameras();
-      if (_cameras.isNotEmpty && _useLiveCamera) await _setupCameraAt(_cameraIndex);
-      else if (mounted) setState(() => _useLiveCamera = false);
+      if (_cameras.isNotEmpty && _useLiveCamera) {
+        await _setupCameraAt(_cameraIndex);
+      } else if (mounted) {
+        setState(() => _useLiveCamera = false);
+      }
     } catch (e) {
       if (mounted) { setState(() => _useLiveCamera = false); _message('Camera unavailable: $e'); }
     }
@@ -161,7 +164,11 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
       await old?.dispose();
     } else {
       setState(() => _useLiveCamera = true);
-      if (_cameras.isEmpty) await _initCameras(); else await _setupCameraAt(_cameraIndex);
+      if (_cameras.isEmpty) {
+        await _initCameras();
+      } else {
+        await _setupCameraAt(_cameraIndex);
+      }
     }
   }
 
@@ -392,7 +399,7 @@ class _DouExpoHomeScreenState extends State<DouExpoHomeScreen> with WidgetsBindi
       IconButton(onPressed:_isExporting?null:_saveRenderedPhoto,icon:const Icon(Icons.save_alt,color:Color(0xFFFACC15))),
       IconButton(onPressed:_isExporting?null:_shareRenderedPhoto,icon:const Icon(Icons.share)),
     ]),
-    SizedBox(height:40,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:_filterPresets.length,separatorBuilder:(_,__)=>const SizedBox(width:7),itemBuilder:(_,i){
+    SizedBox(height:40,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:_filterPresets.length,separatorBuilder:(_, _) => const SizedBox(width:7),itemBuilder:(_,i){
       final n=_filterPresets[i];return ChoiceChip(label:Text(n),selected:_selectedFilterName==n,onSelected:(_)=>setState(()=>_selectedFilterName=n));
     })),
     if(_isExporting)const LinearProgressIndicator(),

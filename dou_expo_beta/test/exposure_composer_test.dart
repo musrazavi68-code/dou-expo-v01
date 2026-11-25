@@ -58,8 +58,8 @@ void main() {
     final forest = await _solidImage(16, 16, const ui.Color(0xFF477A35));
     try {
       final suggested = await StencilLibrary.complementaryColor(forest, stencil: StencilKind.tree);
-      expect(suggested.red, greaterThan(suggested.green));
-      expect(suggested.green, greaterThan(suggested.blue));
+      expect(suggested.r, greaterThan(suggested.g));
+      expect(suggested.g, greaterThan(suggested.b));
     } finally {
       forest.dispose();
     }
@@ -99,10 +99,10 @@ void main() {
       final outsideCenter = await _pixel(Uint8List.fromList(outside), 20, 10, 5);
       final outsideCorner = await _pixel(Uint8List.fromList(outside), 20, 0, 0);
 
-      expect(insideCenter.b, greaterThan(insideCenter.red));
-      expect(insideCorner.r, greaterThan(insideCorner.blue));
-      expect(outsideCenter.red, greaterThan(outsideCenter.blue));
-      expect(outsideCorner.blue, greaterThan(outsideCorner.red));
+      expect(insideCenter.b, greaterThan(insideCenter.r));
+      expect(insideCorner.r, greaterThan(insideCorner.b));
+      expect(outsideCenter.r, greaterThan(outsideCenter.b));
+      expect(outsideCorner.b, greaterThan(outsideCorner.r));
     } finally {
       base.dispose();
       overlay.dispose();

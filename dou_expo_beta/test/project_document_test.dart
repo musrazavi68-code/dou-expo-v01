@@ -86,6 +86,33 @@ void main() {
     );
   });
 
+  test('copy helpers preserve identity and freeze changed values', () {
+    final now = DateTime.utc(2026);
+    final base = ProjectDocument(
+      id: 'copy-project',
+      name: 'Original',
+      createdAt: now,
+      updatedAt: now,
+      canvas: const {'width': 100},
+      layers: [
+        LayerDocument(id: 'base', name: 'Base', assetPath: 'assets/base.jpg'),
+      ],
+    );
+    final changed = base.copyWith(
+      name: 'Renamed',
+      canvas: {'width': 200},
+      layers: [base.layers.single.copyWith(opacity: .5)],
+    );
+
+    expect(changed.id, base.id);
+    expect(changed.createdAt, base.createdAt);
+    expect(changed.name, 'Renamed');
+    expect(changed.canvas['width'], 200);
+    expect(changed.layers.single.opacity, .5);
+    expect(base.name, 'Original');
+    expect(base.layers.single.opacity, 1);
+  });
+
   test('unknown schema version is rejected instead of silently corrupted', () {
     expect(
       () => ProjectDocument.fromJson({'schemaVersion': 99}),

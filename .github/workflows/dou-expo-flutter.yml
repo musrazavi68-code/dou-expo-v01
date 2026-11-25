@@ -67,14 +67,18 @@ jobs:
             test -x "$tool" || { echo "::error::Android build tool missing: $tool"; exit 1; }
           done
 
-          # Create a beta-only signing key. A release-signed APK is required by Android Package Manager.
+          # Use one persistent private key so Android accepts future APKs as updates.
+          : "${DOU_EXPO_KEYSTORE_BASE64:?Set repository secret DOU_EXPO_KEYSTORE_BASE64}"
+          : "${DOU_EXPO_KEYSTORE_PASSWORD:?Set repository secret DOU_EXPO_KEYSTORE_PASSWORD}"
+          : "${DOU_EXPO_KEY_ALIAS:?Set repository secret DOU_EXPO_KEY_ALIAS}"
+          : "${DOU_EXPO_KEY_PASSWORD:?Set repository secret DOU_EXPO_KEY_PASSWORD}"
           KEYSTORE="$RUNNER_TEMP/dou-expo-beta-signing.jks"
-          keytool -genkeypair -v -keystore "$KEYSTORE" -storepass douexpo-beta -alias douexpo \
-            -keypass douexpo-beta -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Dou Expo Beta, OU=Beta, O=Dou Expo, L=Montreal, ST=Quebec, C=CA"
+          printf '%s' "$DOU_EXPO_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
           "$ZIPALIGN" -f -p 4 "$APK" "$RUNNER_TEMP/app-release-aligned.apk"
-          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias douexpo \
-            --ks-pass pass:douexpo-beta --key-pass pass:douexpo-beta \
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$DOU_EXPO_KEY_ALIAS" \
+            --ks-pass "pass:$DOU_EXPO_KEYSTORE_PASSWORD" --key-pass "pass:$DOU_EXPO_KEY_PASSWORD" \
             --out "$APK" "$RUNNER_TEMP/app-release-aligned.apk"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
           "$AAPT" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
@@ -83,6 +87,11 @@ jobs:
           unzip -Z1 "$APK" | grep -q '^lib/arm64-v8a/libapp.so$'
           sha256sum "$APK"
           ls -lh "$APK"
+        env:
+          DOU_EXPO_KEYSTORE_BASE64: ${{ secrets.DOU_EXPO_KEYSTORE_BASE64 }}
+          DOU_EXPO_KEYSTORE_PASSWORD: ${{ secrets.DOU_EXPO_KEYSTORE_PASSWORD }}
+          DOU_EXPO_KEY_ALIAS: ${{ secrets.DOU_EXPO_KEY_ALIAS }}
+          DOU_EXPO_KEY_PASSWORD: ${{ secrets.DOU_EXPO_KEY_PASSWORD }}
       - name: Package clean source ZIP
         run: |
           set -euo pipefail

@@ -4,9 +4,29 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+/// Controls where the second exposure is allowed to appear.
+enum OverlayMaskMode { fullFrame, insidePortrait, outsidePortrait }
+
 /// Real two-image compositor. The second exposure is painted with a true
 /// Porter-Duff blend mode; it is not a decorative gradient overlay.
 class ExposureComposer {
+  /// Normalized head-and-shoulders silhouette, scaled to the output canvas.
+  static Path portraitMaskPath(Size size) {
+    final w = size.width;
+    final h = size.height;
+    return Path()
+      ..moveTo(w * .50, h * .07)
+      ..cubicTo(w * .36, h * .07, w * .27, h * .17, w * .27, h * .30)
+      ..cubicTo(w * .27, h * .41, w * .34, h * .49, w * .41, h * .52)
+      ..cubicTo(w * .27, h * .55, w * .12, h * .64, w * .08, h * .78)
+      ..cubicTo(w * .05, h * .86, w * .05, h * .92, w * .05, h * .96)
+      ..lineTo(w * .95, h * .96)
+      ..cubicTo(w * .95, h * .92, w * .95, h * .86, w * .92, h * .78)
+      ..cubicTo(w * .88, h * .64, w * .73, h * .55, w * .59, h * .52)
+      ..cubicTo(w * .66, h * .49, w * .73, h * .41, w * .73, h * .30)
+      ..cubicTo(w * .73, h * .17, w * .64, h * .07, w * .50, h * .07)
+      ..close();
+  }
   static Future<ui.Image> decode(Uint8List bytes) async {
     final codec = await ui.instantiateImageCodec(bytes);
     try {
@@ -48,6 +68,7 @@ class ExposureComposer {
     required double overlayEv,
     required Offset overlayOffset,
     required double overlayScale,
+    required OverlayMaskMode maskMode,
   }) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -70,6 +91,17 @@ class ExposureComposer {
         width: destination.width * overlayScale,
         height: destination.height * overlayScale,
       );
+      if (maskMode != OverlayMaskMode.fullFrame) {
+        canvas.save();
+        final mask = portraitMaskPath(size);
+        canvas.clipPath(
+          mask,
+          doAntiAlias: true,
+          clipOp: maskMode == OverlayMaskMode.insidePortrait
+              ? ClipOp.intersect
+              : ClipOp.difference,
+        );
+      }
       canvas.drawImageRect(
         overlay,
         Rect.fromLTWH(0, 0, overlay.width.toDouble(), overlay.height.toDouble()),
@@ -80,6 +112,7 @@ class ExposureComposer {
           ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
           ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
       );
+      if (maskMode != OverlayMaskMode.fullFrame) canvas.restore();
     }
     canvas.restore();
   }
@@ -95,6 +128,7 @@ class ExposureComposer {
     required double overlayEv,
     required Offset overlayOffset,
     required double overlayScale,
+    required OverlayMaskMode maskMode,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -109,6 +143,7 @@ class ExposureComposer {
       overlayEv: overlayEv,
       overlayOffset: overlayOffset,
       overlayScale: overlayScale,
+      maskMode: maskMode,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
@@ -133,6 +168,7 @@ class ExposurePreviewPainter extends CustomPainter {
     required this.overlayEv,
     required this.overlayOffset,
     required this.overlayScale,
+    required this.maskMode,
   });
 
   final ui.Image? base;
@@ -143,6 +179,7 @@ class ExposurePreviewPainter extends CustomPainter {
   final double overlayEv;
   final Offset overlayOffset;
   final double overlayScale;
+  final OverlayMaskMode maskMode;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -160,6 +197,7 @@ class ExposurePreviewPainter extends CustomPainter {
       overlayEv: overlayEv,
       overlayOffset: overlayOffset,
       overlayScale: overlayScale,
+      maskMode: maskMode,
     );
   }
 
@@ -172,5 +210,6 @@ class ExposurePreviewPainter extends CustomPainter {
       old.baseEv != baseEv ||
       old.overlayEv != overlayEv ||
       old.overlayOffset != overlayOffset ||
-      old.overlayScale != overlayScale;
+      old.overlayScale != overlayScale ||
+      old.maskMode != maskMode;
 }

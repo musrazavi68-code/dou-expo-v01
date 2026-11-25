@@ -64,7 +64,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  CameraController? _camera;
  List<CameraDescription> _cameras=[];
  ui.Image? _base,_overlay;
- bool _cameraOpen=false,_cameraReady=false,_busy=false,_capturePending=false;
+ bool _cameraOpen=false,_cameraReady=false,_busy=false,_capturePending=false,_cameraStarting=false;
  double _cameraEv=0;
  int _selfTimer=0;
  double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1;
@@ -90,14 +90,21 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  @override void dispose(){WidgetsBinding.instance.removeObserver(this);_camera?.dispose();_base?.dispose();_overlay?.dispose();super.dispose();}
  @override void didChangeAppLifecycleState(AppLifecycleState s){
   if(s==AppLifecycleState.paused||s==AppLifecycleState.inactive){final c=_camera;_camera=null;_cameraReady=false;c?.dispose();if(mounted)setState((){});}
-  if(s==AppLifecycleState.resumed&&_cameraOpen)_startCamera();
+  if(s==AppLifecycleState.resumed&&_cameraOpen&&_camera==null)_startCamera();
  }
  Future<void> _startCamera() async {
-  try{_cameras=await availableCameras();if(_cameras.isEmpty)return;
-   final c=CameraController(_cameras[_cameraIndex % _cameras.length],ResolutionPreset.high,enableAudio:false);
-   await c.initialize();if(!mounted){await c.dispose();return;}
-   setState((){_camera=c;_cameraReady=true;_cameraOpen=true;});
-  }catch(e){_toast('Camera: '+e.toString());}
+  if(_cameraStarting||_camera!=null)return;
+  _cameraStarting=true;_cameraOpen=true;
+  CameraController? candidate;
+  try{
+   _cameras=await availableCameras();if(_cameras.isEmpty){_cameraOpen=false;return;}
+   candidate=CameraController(_cameras[_cameraIndex % _cameras.length],ResolutionPreset.high,enableAudio:false);
+   await candidate.initialize();
+   if(!mounted||!_cameraOpen){await candidate.dispose();return;}
+   setState(()=>_camera=candidate);
+   setState(()=>_cameraReady=true);
+  }catch(e){await candidate?.dispose();_cameraOpen=false;_toast('Camera: '+e.toString());}
+  finally{_cameraStarting=false;}
  }
  void _toast(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
  Future<void> _load(bool second) async {
@@ -125,7 +132,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  }
  Future<void> _toggleCamera() async {
   if(_cameraOpen){final c=_camera;_camera=null;setState((){_cameraOpen=false;_cameraReady=false;});await c?.dispose();}
-  else{await _startCamera();}
+  else{_cameraOpen=true;await _startCamera();}
  }
  Future<void> _switchLens() async {
   if(_cameras.length<2){_toast('No second camera lens');return;}

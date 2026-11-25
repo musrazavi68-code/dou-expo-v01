@@ -218,10 +218,10 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
        DropdownMenuItem(value:StencilKind.arch,child:Text('Persian arch')),
        DropdownMenuItem(value:StencilKind.wingedBull,child:Text('Winged bull')),
       ],onChanged:(v)async{if(v==null)return;setState(()=>_stencil=v);
-       final image=_overlay;if(image!=null){final color=await StencilLibrary.complementaryColor(image);
+       final image=_overlay;if(image!=null){final color=await StencilLibrary.complementaryColor(image,stencil:_stencil);
         if(mounted)setState(()=>_stencilTint=color);}})),
      IconButton(tooltip:'Suggest stencil color from second image',onPressed:_overlay==null?null:()async{
-      final color=await StencilLibrary.complementaryColor(_overlay!);
+      final color=await StencilLibrary.complementaryColor(_overlay!,stencil:_stencil);
       if(mounted){setState(()=>_stencilTint=color);_toast('Complementary color suggested');}
      },icon:const Icon(Icons.colorize,size:18)),
     ]),

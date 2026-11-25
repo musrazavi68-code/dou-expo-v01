@@ -32,7 +32,9 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  CameraController? _camera;
  List<CameraDescription> _cameras=[];
  ui.Image? _base,_overlay;
- bool _cameraOpen=false,_cameraReady=false,_busy=false;
+ bool _cameraOpen=false,_cameraReady=false,_busy=false,_capturePending=false;
+ double _cameraEv=0;
+ int _selfTimer=0;
  double _mix=.78,_baseEv=-.7,_overlayEv=.15,_scale=1;
  Offset _offset=Offset.zero;
  final List<MaskStroke> _maskStrokes=[];
@@ -73,13 +75,21 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    if(!second){final c=_camera;_camera=null;_cameraOpen=false;_cameraReady=false;await c?.dispose();}
   }catch(e){_toast('Image load failed: '+e.toString());}
  }
+ Future<void> _setCameraEv(double value) async {
+  final c=_camera;if(c==null||!c.value.isInitialized)return;
+  try{final actual=await c.setExposureOffset(value);if(mounted)setState(()=>_cameraEv=actual);}
+  catch(e){_toast('Exposure compensation unavailable: '+e.toString());}
+ }
  Future<void> _capture() async {
-  final c=_camera;if(c==null||!c.value.isInitialized){_toast('Camera not ready');return;}
-  try{final x=await c.takePicture();final im=await ExposureComposer.decode(await File(x.path).readAsBytes());
+  final c=_camera;if(c==null||!c.value.isInitialized||_capturePending){_toast('Camera not ready');return;}
+  try{
+   if(_selfTimer>0){setState(()=>_capturePending=true);_toast('Capture in '+_selfTimer.toString()+' seconds');await Future.delayed(Duration(seconds:_selfTimer));}
+   if(!mounted||_camera!=c)return;
+   final x=await c.takePicture();final im=await ExposureComposer.decode(await File(x.path).readAsBytes());
    if(!mounted){im.dispose();return;}
    setState((){if(_base==null){_base=im;}else{_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}});
    _camera=null;_cameraOpen=false;_cameraReady=false;await c.dispose();
-  }catch(e){_toast('Capture failed: '+e.toString());}
+  }catch(e){_toast('Capture failed: '+e.toString());}finally{if(mounted)setState(()=>_capturePending=false);}
  }
  Future<void> _toggleCamera() async {
   if(_cameraOpen){final c=_camera;_camera=null;setState((){_cameraOpen=false;_cameraReady=false;});await c?.dispose();}
@@ -218,9 +228,22 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    SizedBox(width:48,child:Text(text??(value*100).round().toString()+'%',
     textAlign:TextAlign.end,style:const TextStyle(fontSize:9)))]);
  }
+ void _applyRecipe(String recipe){setState((){switch(recipe){
+  case 'Classic':_filmEffect=FilmEffect.grain;_effectAmount=.22;_contrast=1.08;_saturation=.92;_baseEv=0;break;
+  case 'Cinematic':_filmEffect=FilmEffect.grain;_effectAmount=.38;_contrast=1.28;_saturation=.78;_baseEv=-.25;break;
+  case 'Noir':_filmEffect=FilmEffect.grain;_effectAmount=.32;_contrast=1.55;_saturation=0;_baseEv=-.35;break;
+  case 'Vintage':_filmEffect=FilmEffect.grain;_effectAmount=.48;_contrast=1.12;_saturation=.82;_baseEv=.1;break;
+  case 'Motion':_filmEffect=FilmEffect.scanlines;_effectAmount=.18;_contrast=1.12;_saturation=1;break;
+  case 'Clean':_filmEffect=FilmEffect.none;_effectAmount=0;_contrast=1;_saturation=1;break;
+ }});}
  Widget _controls()=>Container(padding:const EdgeInsets.fromLTRB(10,8,10,12),
   decoration:const BoxDecoration(color:Color(0xFF151519),borderRadius:BorderRadius.vertical(top:Radius.circular(18))),
   child:Column(mainAxisSize:MainAxisSize.min,children:[
+   if(_cameraReady)...[
+    Row(children:[const SizedBox(width:105,child:Text('CAMERA EV',style:TextStyle(fontSize:9,color:Colors.white60))),Expanded(child:Slider(value:_cameraEv.clamp(-2,2),min:-2,max:2,divisions:16,onChanged:_setCameraEv)),SizedBox(width:42,child:Text(_cameraEv.toStringAsFixed(1)+' EV',style:const TextStyle(fontSize:9)))]),
+    Row(children:[const SizedBox(width:105,child:Text('SELF TIMER',style:TextStyle(fontSize:9,color:Colors.white60))),Expanded(child:Wrap(spacing:4,children:[0,3,5,10].map((v)=>ChoiceChip(label:Text(v==0?'OFF':v.toString()+'s'),selected:_selfTimer==v,onSelected:(_)=>setState(()=>_selfTimer=v))).toList()))]),
+    const Padding(padding:EdgeInsets.only(bottom:5),child:Text('Single shutter capture · one camera exposure per tap',style:TextStyle(fontSize:9,color:Colors.white54))),
+   ],
    Row(children:[
     _button(Icons.image_outlined,'FIRST PHOTO',()=>_load(false)),
     _button(Icons.layers_outlined,'PATTERN / 2ND',()=>_load(true)),
@@ -311,6 +334,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     if(_maskMode!=OverlayMaskMode.fullFrame)
      const Padding(padding:EdgeInsets.only(bottom:4),child:Text('Portrait silhouette mask · brush to reveal or erase image two · undo supported',style:TextStyle(fontSize:9,color:Colors.white54))),
     const Divider(height:12),
+    const Align(alignment:Alignment.centerLeft,child:Text('FILM RECIPES',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold,color:Colors.white70))),
+    Wrap(spacing:5,runSpacing:2,children:['Classic','Cinematic','Noir','Vintage','Motion','Clean'].map((name)=>ActionChip(label:Text(name),onPressed:()=>_applyRecipe(name))).toList()),
     const Align(alignment:Alignment.centerLeft,child:Text('PHOTO FINISH',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold,color:Colors.white70))),
     _slider('CONTRAST',_contrast/2,(v)=>setState(()=>_contrast=v*2),text:_contrast.toStringAsFixed(2)),
     _slider('SATURATION',_saturation/2,(v)=>setState(()=>_saturation=v*2),text:_saturation.toStringAsFixed(2)),

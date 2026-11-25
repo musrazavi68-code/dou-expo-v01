@@ -112,14 +112,14 @@ class ExposureComposer {
             ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
         );
       } else {
-        canvas.saveLayer(Offset.zero & size, Paint());
+        canvas.saveLayer(Offset.zero & size, Paint()..blendMode = blendMode);
         canvas.drawImageRect(
           overlay,
           Rect.fromLTWH(0, 0, overlay.width.toDouble(), overlay.height.toDouble()),
           scaled,
           Paint()
             ..filterQuality = FilterQuality.high
-            ..blendMode = blendMode
+            ..blendMode = BlendMode.srcOver
             ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
             ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
         );
@@ -167,7 +167,7 @@ class ExposureComposer {
                   : null,
           );
         }
-        canvas.restore();
+        canvas.restore(Paint()..blendMode = BlendMode.dstIn);
         canvas.restore();
       }
     }

@@ -38,7 +38,7 @@ class _DouExpoShellState extends State<DouExpoShell> {
    const DarkroomScreen(),
   ];
   return Scaffold(
-   body:IndexedStack(index:_index,children:pages),
+   body:pages[_index],
    bottomNavigationBar:NavigationBar(
     backgroundColor:const Color(0xFF100D0C),
     indicatorColor:const Color(0xFFFACC15).withOpacity(.18),

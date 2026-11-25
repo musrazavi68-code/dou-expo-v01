@@ -80,6 +80,16 @@ class ProjectSession extends ChangeNotifier {
     _markDirty();
   }
 
+  /// Applies one semantic edit and records exactly one history snapshot.
+  ProjectDocument edit(ProjectDocument Function(ProjectDocument current) change) {
+    final next = change(document);
+    if (next.id != document.id) {
+      throw ArgumentError('An edit cannot change the active project identifier');
+    }
+    replace(next);
+    return document;
+  }
+
   void _markDirty() {
     _revision++;
     _dirty = true;

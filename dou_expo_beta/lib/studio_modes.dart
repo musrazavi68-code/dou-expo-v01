@@ -31,7 +31,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    final c=CameraController(_available.first,ResolutionPreset.high,enableAudio:false);
    await c.initialize();final z=await c.getMaxZoomLevel();
    if(!mounted){await c.dispose();return;}
-   setState(()=>{_camera=c,_ready=true,_maxZoom=z});
+   setState(() {_camera=c;_ready=true;_maxZoom=z;});
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Camera unavailable: $e')));}
  }
  Future<void> _setEv(double v) async {final c=_camera;if(c==null)return;try{final a=await c.setExposureOffset(v);if(mounted)setState(()=>_ev=a);}catch(_){}}
@@ -48,7 +48,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
   if(_available.length<2)return;final old=_camera;_camera=null;_ready=false;await old?.dispose();
   final current=_available.indexWhere((x)=>x.lensDirection==old?.description.lensDirection);
   final next=_available[(current+1)%_available.length];
-  try{final c=CameraController(next,ResolutionPreset.high,enableAudio:false);await c.initialize();if(!mounted){await c.dispose();return;}setState(()=>{_camera=c,_ready=true});}
+  try{final c=CameraController(next,ResolutionPreset.high,enableAudio:false);await c.initialize();if(!mounted){await c.dispose();return;}setState(() {_camera=c;_ready=true;});}
   catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Lens switch failed: $e')));}
  }
  @override Widget build(BuildContext context)=>Scaffold(
@@ -103,7 +103,7 @@ class _DarkroomScreenState extends State<DarkroomScreen> {
     _control('BRIGHTNESS',_brightness,-1,1,(v)=>setState(()=>_brightness=v)),
     _control('CONTRAST',_contrast,0,2,(v)=>setState(()=>_contrast=v)),
     _control('SATURATION',_saturation,0,2,(v)=>setState(()=>_saturation=v)),
-    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_pick,icon:const Icon(Icons.photo_library),label:const Text('OPEN PHOTO'))),const SizedBox(width:10),OutlinedButton(onPressed:()=>setState(()=>{_brightness=0,_contrast=1,_saturation=1}),child:const Text('RESET'))])
+    Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_pick,icon:const Icon(Icons.photo_library),label:const Text('OPEN PHOTO'))),const SizedBox(width:10),OutlinedButton(onPressed:()=>setState(() {_brightness=0;_contrast=1;_saturation=1;}),child:const Text('RESET'))])
    ]))
   ])));
  Widget _control(String name,double value,double min,double max,ValueChanged<double> change)=>Row(children:[SizedBox(width:100,child:Text(name,style:const TextStyle(fontSize:10,color:Colors.white60))),Expanded(child:Slider(min:min,max:max,value:value.clamp(min,max),onChanged:change)),SizedBox(width:38,child:Text(value.toStringAsFixed(1),style:const TextStyle(fontSize:10)))]);

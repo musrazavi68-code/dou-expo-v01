@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 enum OverlayMaskMode { fullFrame, insidePortrait, outsidePortrait }
 
 enum StencilKind { none, tree, lotus, cypress, arch, wingedBull }
+enum StencilFillMode { photo, pureWhite, tinted }
 
 class StencilLibrary {
   static Path pathFor(StencilKind kind, Size size) {
@@ -136,6 +137,8 @@ class ExposureComposer {
     double maskFeather = 0,
     List<MaskStroke> maskStrokes = const [],
     StencilKind stencil = StencilKind.none,
+    StencilFillMode stencilFillMode = StencilFillMode.photo,
+    Color stencilTint = const Color(0xFFFF8A00),
   }) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -162,6 +165,9 @@ class ExposureComposer {
         canvas.save();
         canvas.clipPath(StencilLibrary.pathFor(stencil, size), doAntiAlias: true);
       }
+      final overlayColorMatrix = stencil != StencilKind.none && stencilFillMode != StencilFillMode.photo
+          ? <double>[0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.red.toDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.green.toDouble(), 0,0,0,0,stencilFillMode == StencilFillMode.pureWhite ? 255 : stencilTint.blue.toDouble(), 0,0,0,1,0]
+          : exposureMatrix(overlayEv);
       if (maskMode == OverlayMaskMode.fullFrame && maskStrokes.isEmpty) {
         canvas.drawImageRect(
           overlay,
@@ -171,7 +177,7 @@ class ExposureComposer {
             ..filterQuality = FilterQuality.high
             ..blendMode = blendMode
             ..color = Color.fromRGBO(255, 255, 255, mix.clamp(0, 1))
-            ..colorFilter = ColorFilter.matrix(exposureMatrix(overlayEv)),
+            ..colorFilter = ColorFilter.matrix(overlayColorMatrix),
         );
       } else {
         canvas.saveLayer(Offset.zero & size, Paint()..blendMode = blendMode);
@@ -255,6 +261,8 @@ class ExposureComposer {
     double maskFeather = 0,
     List<MaskStroke> maskStrokes = const [],
     StencilKind stencil = StencilKind.none,
+    StencilFillMode stencilFillMode = StencilFillMode.photo,
+    Color stencilTint = const Color(0xFFFF8A00),
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -273,6 +281,8 @@ class ExposureComposer {
       maskFeather: maskFeather,
       maskStrokes: maskStrokes,
       stencil: stencil,
+      stencilFillMode: stencilFillMode,
+      stencilTint: stencilTint,
     );
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
@@ -301,6 +311,8 @@ class ExposurePreviewPainter extends CustomPainter {
     this.maskFeather = 0,
     this.maskStrokes = const [],
     this.stencil = StencilKind.none,
+    this.stencilFillMode = StencilFillMode.photo,
+    this.stencilTint = const Color(0xFFFF8A00),
   });
 
   final ui.Image? base;
@@ -315,6 +327,8 @@ class ExposurePreviewPainter extends CustomPainter {
   final double maskFeather;
   final List<MaskStroke> maskStrokes;
   final StencilKind stencil;
+  final StencilFillMode stencilFillMode;
+  final Color stencilTint;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -336,6 +350,8 @@ class ExposurePreviewPainter extends CustomPainter {
       maskFeather: maskFeather,
       maskStrokes: maskStrokes,
       stencil: stencil,
+      stencilFillMode: stencilFillMode,
+      stencilTint: stencilTint,
     );
   }
 
@@ -352,5 +368,7 @@ class ExposurePreviewPainter extends CustomPainter {
       old.maskMode != maskMode ||
       old.maskFeather != maskFeather ||
       old.maskStrokes != maskStrokes ||
-      old.stencil != stencil;
+      old.stencil != stencil ||
+      old.stencilFillMode != stencilFillMode ||
+      old.stencilTint != stencilTint;
 }

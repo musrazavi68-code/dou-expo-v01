@@ -42,7 +42,7 @@ void main() {
       initial: doc('Initial'),
       persist: (_) async {},
       restore: (_) async => null,
-      writeAsset: (_, _, _) async => 'assets/test.png',
+      writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
     );
 
     session.replace(doc('Edited'));
@@ -65,7 +65,7 @@ void main() {
         if (saved.length == 1) await gate.future;
       },
       restore: (_) async => null,
-      writeAsset: (_, _, _) async => 'assets/test.png',
+      writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
     );
 
     session.replace(doc('First edit'));
@@ -87,7 +87,7 @@ void main() {
       initial: doc('Initial'),
       persist: (value) async { savedName = value.name; },
       restore: (_) async => null,
-      writeAsset: (_, _, _) async => 'assets/test.png',
+      writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
     );
 
     session.replace(doc('Saved'));
@@ -101,7 +101,7 @@ void main() {
       initial: doc('Keep me'),
       persist: (_) async {},
       restore: (_) async => null,
-      writeAsset: (_, _, _) async => 'assets/test.png',
+      writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
     );
 
     expect(await session.open('missing'), isFalse);
@@ -125,7 +125,7 @@ void main() {
           layers: const [],
         );
       },
-      writeAsset: (_, _, _) async => 'assets/test.png',
+      writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
     );
 
     final firstOpen = session.open('first');
@@ -149,8 +149,8 @@ void main() {
       initial: doc('Initial'),
       persist: (_) async {},
       restore: (_) async => null,
-      writeAsset: (id, _, __) async {
-        receivedId = id;
+      writeAsset: (projectId, fileName, bytes) async {
+        receivedId = projectId;
         return 'assets/photo.png';
       },
     );

@@ -40,6 +40,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  bool _maskEdit=false,_eraseBrush=false;
  double _brushSize=.035,_maskFeather=0;
  StencilKind _stencil=StencilKind.none;
+ StencilFillMode _stencilFill=StencilFillMode.photo;
  Color _stencilTint=const Color(0xFFFF8A00);
  bool _tintReady=false;
  int _blend=0,_cameraIndex=0;
@@ -100,7 +101,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   final h=(r>=1?math.max(1,(side/r).round()):side).toInt();
   return ExposureComposer.renderPng(base:b,overlay:_overlay,width:w,height:h,
    blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes,stencil:_stencil);
+   overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:_maskStrokes,stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint);
  }
  Future<void> _export() async {
   if(_base==null||_busy){_toast('Choose first photo');return;}
@@ -168,7 +169,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     });},
     child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
-     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil),
+     overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint),
      child:_cameraOpen && _cameraReady && _camera!=null
       ? CameraPreview(_camera!)
       :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -224,10 +225,19 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     ]),
     if(_stencil!=StencilKind.none)
      Row(children:[
+      const SizedBox(width:105,child:Text('STENCIL MODE',style:TextStyle(fontSize:9,color:Colors.white60))),
+      Expanded(child:Wrap(spacing:4,children:[
+       ChoiceChip(label:const Text('PHOTO'),selected:_stencilFill==StencilFillMode.photo,onSelected:(_)=>setState(()=>_stencilFill=StencilFillMode.photo)),
+       ChoiceChip(label:const Text('WHITE'),selected:_stencilFill==StencilFillMode.pureWhite,onSelected:(_)=>setState(()=>_stencilFill=StencilFillMode.pureWhite)),
+       ChoiceChip(label:const Text('TINT'),selected:_stencilFill==StencilFillMode.tinted,onSelected:(_)=>setState(()=>_stencilFill=StencilFillMode.tinted)),
+      ]))
+     ]),
+    if(_stencil!=StencilKind.none)
+     Row(children:[
       const SizedBox(width:105,child:Text('SUGGESTED COLOR',style:TextStyle(fontSize:9,color:Colors.white60))),
       Container(width:25,height:25,decoration:BoxDecoration(color:_stencilTint,shape:BoxShape.circle,border:Border.all(color:Colors.white54))),
       const SizedBox(width:8),Text('#'+_stencilTint.value.toRadixString(16).substring(2).toUpperCase()),
-      const Spacer(),TextButton(onPressed:()=>setState(()=>_stencilTint=Colors.white),child:const Text('PURE WHITE')),
+      const Spacer(),TextButton(onPressed:()=>setState(()=>_stencilTint=Colors.white),child:const Text('SET WHITE')),
      ]),
     Row(children:[
      const SizedBox(width:105,child:Text('2ND IMAGE MASK',style:TextStyle(fontSize:9,color:Colors.white60))),

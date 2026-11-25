@@ -16,8 +16,7 @@ class ProjectSession extends ChangeNotifier {
   })  : _history = HistoryStack<ProjectDocument>(
           initial: initial,
           capacity: historyCapacity,
-        ),
-        ;
+        );
 
   factory ProjectSession({
     required ProjectDocument initial,

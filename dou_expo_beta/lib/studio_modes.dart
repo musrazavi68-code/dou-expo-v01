@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 
 const _ink=Color(0xFF100C0B);
 const _yellow=Color(0xFFFACC15);
@@ -17,6 +18,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  CameraController? _camera;
  List<CameraDescription> _available=[];
  bool _ready=false,_manual=false,_busy=false;
+ int _timerSeconds=0,_countdown=0;
  double _ev=0,_zoom=1,_maxZoom=4;
  String _film='COLOR';
  XFile? _lastShot;
@@ -38,12 +40,47 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  Future<void> _setEv(double v) async {final c=_camera;if(c==null)return;try{final a=await c.setExposureOffset(v);if(mounted)setState(()=>_ev=a);}catch(_){}}
  Future<void> _setZoom(double v) async {final c=_camera;if(c==null)return;try{await c.setZoomLevel(v);if(mounted)setState(()=>_zoom=v);}catch(_){}}
  Future<void> _focus(Offset p, Size size) async {final c=_camera;if(c==null)return;try{await c.setFocusPoint(Offset(p.dx/size.width,p.dy/size.height));await c.setExposurePoint(Offset(p.dx/size.width,p.dy/size.height));}catch(_){}}
+ Future<Uint8List> _applyFilm(Uint8List bytes,String recipe) async {
+  final decoded=img.decodeImage(bytes);
+  if(decoded==null) throw StateError('Captured image could not be decoded');
+  final random=math.Random(DateTime.now().millisecondsSinceEpoch);
+  for(var y=0;y<decoded.height;y++){
+   for(var x=0;x<decoded.width;x++){
+    final pixel=decoded.getPixel(x,y);
+    var r=pixel.r.toDouble(),g=pixel.g.toDouble(),b=pixel.b.toDouble();
+    if(recipe=='MONO'){
+     final luminance=.2126*r+.7152*g+.0722*b;r=luminance;g=luminance;b=luminance;
+    }else if(recipe=='WARM'){
+     r=(r*1.08+7).clamp(0,255);g=(g*1.015).clamp(0,255);b=(b*.88).clamp(0,255);
+    }else if(recipe=='COOL'){
+     r=(r*.90).clamp(0,255);g=(g*1.01).clamp(0,255);b=(b*1.09+5).clamp(0,255);
+    }
+    final grain=recipe=='COLOR'?0:random.nextInt(7)-3;
+    decoded.setPixelRgba(x,y,(r+grain).round().clamp(0,255),(g+grain).round().clamp(0,255),(b+grain).round().clamp(0,255),pixel.a.toInt());
+   }
+  }
+  return Uint8List.fromList(img.encodeJpg(decoded,quality:95));
+ }
  Future<void> _capture() async {
   final c=_camera;if(c==null||!c.value.isInitialized||_busy)return;
   setState(()=>_busy=true);
-  try{final shot=await c.takePicture();await Gal.putImage(shot.path,album:'Dou Expo');if(mounted)setState(()=>_lastShot=shot);}
-  catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Capture failed: $e')));}
-  finally{if(mounted)setState(()=>_busy=false);}
+  try{
+   for(var remaining=_timerSeconds;remaining>0;remaining--){
+    if(!mounted)return;
+    setState(()=>_countdown=remaining);
+    await Future.delayed(const Duration(seconds:1));
+   }
+   if(!mounted)return;
+   final shot=await c.takePicture();
+   final developed=await _applyFilm(await File(shot.path).readAsBytes(),_film);
+   await Gal.putImageBytes(developed,name:'ordinary_'+DateTime.now().millisecondsSinceEpoch.toString()+'.jpg',album:'Dou Expo');
+   if(mounted){
+    setState(()=>_lastShot=XFile(shot.path));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Saved $_film · one exposure')));
+   }
+  }catch(e){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Capture failed: $e')));
+  }finally{if(mounted)setState(()=>{_busy=false,_countdown=0});}
  }
  Future<void> _flip() async {
   if(_available.length<2)return;final old=_camera;_camera=null;_ready=false;await old?.dispose();
@@ -64,7 +101,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
      child:Stack(fit:StackFit.expand,children:[
       if(_ready&&_camera!=null)CameraPreview(_camera!) else const ColoredBox(color:Color(0xFF24201E),child:Center(child:CircularProgressIndicator(color:_yellow))),
       const IgnorePointer(child:Center(child:Icon(Icons.add,size:34,color:Colors.white70))),
-      Positioned(left:14,top:14,child:Text(_manual?'EV  ${_ev.toStringAsFixed(1)}':'ONE PRESS · ONE EXPOSURE',style:const TextStyle(fontSize:11,color:Colors.white,shadows:[Shadow(blurRadius:5,color:Colors.black)]))),
+      Positioned(left:14,top:14,child:Text(_countdown>0?'${_countdown}s':_manual?'EV  ${_ev.toStringAsFixed(1)}':'ONE PRESS · ONE EXPOSURE',style:const TextStyle(fontSize:11,color:Colors.white,shadows:[Shadow(blurRadius:5,color:Colors.black)]))),
       Positioned(right:14,bottom:14,child:Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),decoration:const BoxDecoration(color:Colors.white,borderRadius:BorderRadius.all(Radius.circular(22))),child:Text('${_zoom.toStringAsFixed(1)}x',style:const TextStyle(color:Colors.black,fontWeight:FontWeight.bold)))),
      ]),
     )),
@@ -77,7 +114,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
     GestureDetector(onTap:()=>_lastShot==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.file(File(_lastShot!.path)))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShot==null?null:DecorationImage(image:FileImage(File(_lastShot!.path)),fit:BoxFit.cover)),child:_lastShot==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),
     GestureDetector(onTap:_capture,child:Container(width:86,height:86,decoration:const BoxDecoration(color:Colors.white,shape:BoxShape.circle),child:Center(child:_busy?const CircularProgressIndicator(color:_ink):const Icon(Icons.add,size:38,color:_ink)))),
-    Column(children:[const Text('FILM',style:TextStyle(fontSize:9,color:Colors.white54)),DropdownButton<String>(value:_film,dropdownColor:_ink,underline:const SizedBox(),items:const ['COLOR','MONO','WARM','COOL'].map((x)=>DropdownMenuItem(value:x,child:Text(x,style:const TextStyle(fontSize:11)))).toList(),onChanged:(v){if(v!=null)setState(()=>_film=v);})])
+    Column(children:[const Text('FILM / TIMER',style:TextStyle(fontSize:9,color:Colors.white54)),DropdownButton<String>(value:_film,dropdownColor:_ink,underline:const SizedBox(),items:const ['COLOR','MONO','WARM','COOL'].map((x)=>DropdownMenuItem(value:x,child:Text(x,style:const TextStyle(fontSize:11)))).toList(),onChanged:(v){if(v!=null)setState(()=>_film=v);}),DropdownButton<int>(value:_timerSeconds,dropdownColor:_ink,underline:const SizedBox(),items:const [0,3,5,10].map((v)=>DropdownMenuItem(value:v,child:Text(v==0?'OFF':'${v}s',style:const TextStyle(fontSize:10)))).toList(),onChanged:(v){if(v!=null)setState(()=>_timerSeconds=v);})])
    ]))
   ])),
  );

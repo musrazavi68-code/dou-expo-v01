@@ -60,6 +60,7 @@ class DouExpoEditor extends StatefulWidget {
 }
 class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserver {
  final _picker=ImagePicker();
+ final GlobalKey _previewKey=GlobalKey();
  CameraController? _camera;
  List<CameraDescription> _cameras=[];
  ui.Image? _base,_overlay;
@@ -236,7 +237,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     onScaleUpdate:(d){if(_overlay==null||_maskEdit)return;setState((){
      _scale=(_scale*d.scale).clamp(.2,5).toDouble();_offset+=Offset(d.focalPointDelta.dx/400,d.focalPointDelta.dy/600);
     });},
-    child:CustomPaint(size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
+    child:CustomPaint(key:_previewKey,size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
      overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint,contrast:_contrast,saturation:_saturation,filmEffect:_filmEffect,effectAmount:_effectAmount),
      child:_cameraOpen && _cameraReady && _camera!=null

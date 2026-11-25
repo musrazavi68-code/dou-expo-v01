@@ -20,29 +20,35 @@ jobs:
           channel: stable
       - name: Flutter version
         run: flutter --version
-      - name: Generate Android platform project
+      - name: Generate Android and iOS platform projects
         working-directory: dou_expo_beta
-        run: flutter create --platforms=android --project-name dou_expo_beta --org com.douexpo .
+        run: flutter create --platforms=android,ios --project-name dou_expo_beta --org com.douexpo .
+      - name: Apply camera and photo library permissions
+        working-directory: dou_expo_beta
+        run: python3 tool/configure_permissions.py
       - name: Resolve dependencies
         working-directory: dou_expo_beta
         run: flutter pub get
       - name: Analyze
         working-directory: dou_expo_beta
         run: flutter analyze
+      - name: Run tests
+        working-directory: dou_expo_beta
+        run: flutter test
       - name: Build release APK
         working-directory: dou_expo_beta
         run: flutter build apk --release
       - name: Package source ZIP
-        run: zip -r dou_expo_beta.zip dou_expo_beta -x 'dou_expo_beta/build/*' 'dou_expo_beta/.dart_tool/*'
+        run: zip -r dou_expo_beta_v0.2.zip dou_expo_beta -x 'dou_expo_beta/build/*' 'dou_expo_beta/.dart_tool/*'
       - name: Upload source ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-Flutter-Source-ZIP
-          path: dou_expo_beta.zip
+          name: Dou-Expo-Beta-v0.2-Source-ZIP
+          path: dou_expo_beta_v0.2.zip
           if-no-files-found: error
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Dou-Expo-Flutter-Beta-0.1.0-Release-APK
+          name: Dou-Expo-Beta-v0.2-Release-APK
           path: dou_expo_beta/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error

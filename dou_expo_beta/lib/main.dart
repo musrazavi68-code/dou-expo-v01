@@ -186,17 +186,25 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  }
  void _onProjectChanged(){unawaited(_restoreFromProject());}
  Future<void> _restoreFromProject() async {
-  final token=++_restoreToken;final project=widget.session.document;
+  final token=++_restoreToken;
+  final project=widget.session.document;
   final bases=project.layers.where((v)=>v.name=='Base photograph').toList();
   final overlays=project.layers.where((v)=>v.name=='Second exposure').toList();
   final basePath=bases.isEmpty?null:bases.last.assetPath;
   final overlayPath=overlays.isEmpty?null:overlays.last.assetPath;
+  final projectChanged=project.id!=_loadedProjectId;
+  ui.Image? nextBase,nextOverlay;
   try{
-   ui.Image? nextBase,nextOverlay;
-   if(basePath!=_loadedBasePath&&basePath!=null){final file=await ProjectStore().resolveAsset(project.id,basePath);nextBase=await ExposureComposer.decode(await file.readAsBytes());}
-   if(token!=_restoreToken||!mounted){nextBase?.dispose();return;}
-   if(overlayPath!=_loadedOverlayPath&&overlayPath!=null){final file=await ProjectStore().resolveAsset(project.id,overlayPath);nextOverlay=await ExposureComposer.decode(await file.readAsBytes());}
-   if(token!=_restoreToken||!mounted){nextBase?.dispose();nextOverlay?.dispose();return;}
+   if(basePath!=null&&(projectChanged||basePath!=_loadedBasePath)){
+    final file=await ProjectStore().resolveAsset(project.id,basePath);
+    nextBase=await ExposureComposer.decode(await file.readAsBytes());
+   }
+   if(token!=_restoreToken||!mounted)return;
+   if(overlayPath!=null&&(projectChanged||overlayPath!=_loadedOverlayPath)){
+    final file=await ProjectStore().resolveAsset(project.id,overlayPath);
+    nextOverlay=await ExposureComposer.decode(await file.readAsBytes());
+   }
+   if(token!=_restoreToken||!mounted)return;
    final raw=project.canvas['doubleExposure'];
    if(raw is Map){
     final settings=Map<String,Object?>.from(raw);
@@ -208,31 +216,60 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     final effectIndex=FilmEffect.values.indexWhere((v)=>v.name==settings['filmEffect']);
     final strokes=<MaskStroke>[];
     final rawStrokes=settings['maskStrokes'];
-    if(rawStrokes is List){for(final item in rawStrokes){if(item is! Map)continue;final points=item['points'];if(points is! List||points.isEmpty)continue;final path=Path();for(var i=0;i<points.length;i++){final point=points[i];if(point is! Map)continue;final x=(point['x'] as num?)?.toDouble()??0;final y=(point['y'] as num?)?.toDouble()??0;if(i==0){path.moveTo(x,y);}else{path.lineTo(x,y);}}strokes.add(MaskStroke(path:path,width:(item['width'] as num?)?.toDouble()??.03,erase:item['erase']==true));}}
+    if(rawStrokes is List){
+     for(final item in rawStrokes){
+      if(item is! Map)continue;
+      final points=item['points'];
+      if(points is! List||points.isEmpty)continue;
+      final path=Path();
+      for(var i=0;i<points.length;i++){
+       final point=points[i];
+       if(point is! Map)continue;
+       final x=(point['x'] as num?)?.toDouble()??0;
+       final y=(point['y'] as num?)?.toDouble()??0;
+       if(i==0){path.moveTo(x,y);}else{path.lineTo(x,y);}
+      }
+      strokes.add(MaskStroke(path:path,width:(item['width'] as num?)?.toDouble()??.03,erase:item['erase']==true));
+     }
+    }
     setState((){
-     if(nextBase!=null){_base?.dispose();_base=nextBase;_loadedBasePath=basePath;}
-     if(nextOverlay!=null){_overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;}
-     if(basePath==null){_base?.dispose();_base=null;_loadedBasePath=null;}
-     if(overlayPath==null){_overlay?.dispose();_overlay=null;_loadedOverlayPath=null;}
+     if(projectChanged||basePath==null||nextBase!=null){
+      _base?.dispose();_base=nextBase;_loadedBasePath=basePath;
+     }
+     if(projectChanged||overlayPath==null||nextOverlay!=null){
+      _overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;
+     }
+     _loadedProjectId=project.id;
      _mix=readValue('mix',_mix);_baseEv=readValue('baseExposure',_baseEv);_overlayEv=readValue('overlayExposure',_overlayEv);
      _offset=Offset(readValue('offsetX',_offset.dx),readValue('offsetY',_offset.dy));_scale=readValue('scale',_scale);
      _maskFeather=readValue('maskFeather',_maskFeather);_brushSize=readValue('brushSize',_brushSize);
      _contrast=readValue('contrast',_contrast);_saturation=readValue('saturation',_saturation);_effectAmount=readValue('effectAmount',_effectAmount);
-     if(blendIndex>=0)_blend=blendIndex;if(maskIndex>=0)_maskMode=OverlayMaskMode.values[maskIndex];if(stencilIndex>=0)_stencil=StencilKind.values[stencilIndex];if(fillIndex>=0)_stencilFill=StencilFillMode.values[fillIndex];if(effectIndex>=0)_filmEffect=FilmEffect.values[effectIndex];
+     if(blendIndex>=0)_blend=blendIndex;
+     if(maskIndex>=0)_maskMode=OverlayMaskMode.values[maskIndex];
+     if(stencilIndex>=0)_stencil=StencilKind.values[stencilIndex];
+     if(fillIndex>=0)_stencilFill=StencilFillMode.values[fillIndex];
+     if(effectIndex>=0)_filmEffect=FilmEffect.values[effectIndex];
      if(settings['stencilTint'] is int)_stencilTint=Color(settings['stencilTint'] as int);
      _maskStrokes..clear()..addAll(strokes);
     });
-   }else{
-    if(nextBase!=null||nextOverlay!=null||basePath==null||overlayPath==null){
-     setState((){
-      if(nextBase!=null){_base?.dispose();_base=nextBase;_loadedBasePath=basePath;}
-      if(nextOverlay!=null){_overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;}
-      if(basePath==null){_base?.dispose();_base=null;_loadedBasePath=null;}
-      if(overlayPath==null){_overlay?.dispose();_overlay=null;_loadedOverlayPath=null;}
-     });
-    }
+    nextBase=null;nextOverlay=null;
+   }else if(projectChanged||basePath==null||overlayPath==null||nextBase!=null||nextOverlay!=null){
+    setState((){
+     if(projectChanged||basePath==null||nextBase!=null){
+      _base?.dispose();_base=nextBase;_loadedBasePath=basePath;
+     }
+     if(projectChanged||overlayPath==null||nextOverlay!=null){
+      _overlay?.dispose();_overlay=nextOverlay;_loadedOverlayPath=overlayPath;
+     }
+     _loadedProjectId=project.id;
+    });
+    nextBase=null;nextOverlay=null;
    }
-  }catch(error){if(mounted)_toast('Project restore failed: $error');}
+  }catch(error){
+   if(mounted&&token==_restoreToken)_toast('Project restore failed: $error');
+  }finally{
+   nextBase?.dispose();nextOverlay?.dispose();
+  }
  }
  @override void didChangeAppLifecycleState(AppLifecycleState s){
   if(s==AppLifecycleState.paused||s==AppLifecycleState.inactive){_flushEditorState();unawaited(widget.session.save().catchError((Object e,StackTrace st){debugPrint('Editor state save failed: $e');}));final c=_camera;_camera=null;_cameraReady=false;c?.dispose();if(mounted)setState((){});}
@@ -307,6 +344,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    if(!mounted)return;
    final layerId=second?'overlay_$stamp':'base_$stamp';
    final current=widget.session.document;
+   _loadedProjectId=current.id;
+   _loadedProjectId=current.id;
    if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],
@@ -505,6 +544,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   setState((){
    _overlay=null;
    _loadedOverlayPath=null;
+   _loadedProjectId=current.id;
    _maskStrokes.clear();
    _activeMaskPath=null;
    _offset=Offset.zero;

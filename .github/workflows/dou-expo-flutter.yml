@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dou-expo-beta-${{ github.ref }}
+  group: dou-expo-beta-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:

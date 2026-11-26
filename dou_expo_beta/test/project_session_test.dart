@@ -143,6 +143,30 @@ void main() {
     expect(session.document.id, 'second');
   });
 
+  test('disposed session rejects edits before changing history and skips reads', () async {
+    var restoreCalls = 0;
+    final session = ProjectSession.withBackend(
+      initial: doc('Initial'),
+      persist: (_) async {},
+      restore: (_) async {
+        restoreCalls++;
+        return null;
+      },
+      writeAsset: (_, _, _) async => 'assets/test.png',
+    );
+
+    session.replace(doc('Before dispose'));
+    session.dispose();
+
+    expect(() => session.replace(doc('After dispose')), throwsStateError);
+    expect(() => session.undo(), throwsStateError);
+    expect(() => session.redo(), throwsStateError);
+    expect(await session.open('another-project'), isFalse);
+    expect(await session.restoreCurrent(), isFalse);
+    expect(session.document.name, 'Before dispose');
+    expect(restoreCalls, 0);
+  });
+
   test('asset writer uses the active project id', () async {
     String? receivedId;
     final session = ProjectSession.withBackend(

@@ -148,6 +148,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  Offset _offset=Offset.zero,_gestureStartOffset=Offset.zero,_gestureStartFocalPoint=Offset.zero;
  final List<MaskStroke> _maskStrokes=[];
  String? _loadedBasePath,_loadedOverlayPath;
+ String? _loadedProjectId;
  int _restoreToken=0;
  Path? _activeMaskPath;
  bool _maskEdit=false,_eraseBrush=false;
@@ -344,7 +345,6 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    if(!mounted)return;
    final layerId=second?'overlay_$stamp':'base_$stamp';
    final current=widget.session.document;
-   _loadedProjectId=current.id;
    _loadedProjectId=current.id;
    if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    widget.session.replace(current.copyWith(

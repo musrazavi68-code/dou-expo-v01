@@ -53,6 +53,7 @@ jobs:
         working-directory: dou_expo_beta
         run: flutter build apk --release
       - name: Align, sign and verify APK
+        id: sign
         working-directory: dou_expo_beta
         shell: bash
         run: |
@@ -67,21 +68,36 @@ jobs:
             test -x "$tool" || { echo "::error::Android build tool missing: $tool"; exit 1; }
           done
 
-          # Use one persistent private key so Android accepts future APKs as updates.
-          : "${DOU_EXPO_KEYSTORE_BASE64:?Set repository secret DOU_EXPO_KEYSTORE_BASE64}"
-          : "${DOU_EXPO_KEYSTORE_PASSWORD:?Set repository secret DOU_EXPO_KEYSTORE_PASSWORD}"
-          : "${DOU_EXPO_KEY_ALIAS:?Set repository secret DOU_EXPO_KEY_ALIAS}"
-          : "${DOU_EXPO_KEY_PASSWORD:?Set repository secret DOU_EXPO_KEY_PASSWORD}"
+          # Prefer the persistent release key; otherwise create a one-run test key.
           KEYSTORE="$RUNNER_TEMP/dou-expo-beta-signing.jks"
-          printf '%s' "$DOU_EXPO_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          if [[ -n "${DOU_EXPO_KEYSTORE_BASE64:-}" && -n "${DOU_EXPO_KEYSTORE_PASSWORD:-}" && -n "${DOU_EXPO_KEY_ALIAS:-}" && -n "${DOU_EXPO_KEY_PASSWORD:-}" ]]; then
+            printf '%s' "$DOU_EXPO_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+            STORE_PASS="$DOU_EXPO_KEYSTORE_PASSWORD"
+            KEY_ALIAS="$DOU_EXPO_KEY_ALIAS"
+            KEY_PASS="$DOU_EXPO_KEY_PASSWORD"
+            SIGNING_MODE="persistent-release"
+            echo "artifact_name=Dou-Expo-Beta-SIGNED-Release-APK" >> "$GITHUB_OUTPUT"
+          else
+            STORE_PASS="$(openssl rand -hex 24)"
+            KEY_ALIAS="dou-expo-test"
+            KEY_PASS="$STORE_PASS"
+            keytool -genkeypair -noprompt -keystore "$KEYSTORE" -storepass "$STORE_PASS" \
+              -alias "$KEY_ALIAS" -keypass "$KEY_PASS" -keyalg RSA -keysize 2048 -validity 3650 \
+              -dname "CN=Dou Expo Temporary CI, OU=Test, O=Dou Expo, C=US"
+            SIGNING_MODE="ephemeral-test"
+            echo "artifact_name=Dou-Expo-Beta-TEST-ONLY-Ephemeral-Signed-APK" >> "$GITHUB_OUTPUT"
+            echo "::warning::Using a temporary signing key. This APK installs, but future builds cannot update it."
+          fi
           test -s "$KEYSTORE"
           chmod 600 "$KEYSTORE"
           "$ZIPALIGN" -f -p 4 "$APK" "$RUNNER_TEMP/app-release-aligned.apk"
-          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$DOU_EXPO_KEY_ALIAS" \
-            --ks-pass "pass:$DOU_EXPO_KEYSTORE_PASSWORD" --key-pass "pass:$DOU_EXPO_KEY_PASSWORD" \
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$STORE_PASS" --key-pass "pass:$KEY_PASS" \
             --out "$APK" "$RUNNER_TEMP/app-release-aligned.apk"
           "$APKSIGNER" verify --verbose --print-certs "$APK"
-          "$APKSIGNER" verify --print-certs "$APK" | grep -Fqi "F5:AB:B7:F6:56:FE:95:F8:3E:68:C2:0A:7D:8A:CF:5A:A6:73:91:89:C6:ED:E2:47:C5:F6:18:46:83:04:AF:C5" || { echo "::error::APK signing certificate does not match the pinned Dou Expo beta key"; exit 1; }
+          if [[ "$SIGNING_MODE" == "persistent-release" ]]; then
+            "$APKSIGNER" verify --print-certs "$APK" | grep -Fqi "F5:AB:B7:F6:56:FE:95:F8:3E:68:C2:0A:7D:8A:CF:5A:A6:73:91:89:C6:ED:E2:47:C5:F6:18:46:83:04:AF:C5" || { echo "::error::APK signing certificate does not match the pinned Dou Expo beta key"; exit 1; }
+          fi
           "$AAPT" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
           grep -q "package: name='com.douexpo.dou_expo_beta' versionCode='4'" "$RUNNER_TEMP/apk-badging.txt"
           grep -q "sdkVersion:'24'" "$RUNNER_TEMP/apk-badging.txt"
@@ -111,7 +127,7 @@ jobs:
       - name: Upload signed APK
         uses: actions/upload-artifact@v6
         with:
-          name: Dou-Expo-Beta-v0.2.3-SIGNED-Release-APK
+          name: ${{ steps.sign.outputs.artifact_name }}
           path: dou_expo_beta/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 90

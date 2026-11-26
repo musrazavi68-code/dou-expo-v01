@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'history_stack.dart';
@@ -119,14 +121,23 @@ class ProjectSession extends ChangeNotifier {
   Future<void> save() {
     final active = _saveFuture;
     if (active != null) return active;
-    // Defer execution one microtask so _saveFuture is installed before
-    // notifyListeners can re-enter save() through an observer.
-    final operation = Future<void>.microtask(_saveUntilClean);
+    // Install the shared future before notifying listeners, because an
+    // observer may re-enter save() and must join this writer.
+    final completer = Completer<void>();
+    final operation = completer.future;
     _saveFuture = operation;
-    // Publish the saving state synchronously after installing the shared
-    // future, so observers can safely re-enter save() and join this writer.
     _saving = true;
     notifyListeners();
+
+    // Start the async writer immediately: it captures the current document
+    // before returning at its first await, so edits made after save() cannot
+    // replace the snapshot that this save was asked to persist.
+    _saveUntilClean().then(
+      (_) => completer.complete(),
+      onError: (Object error, StackTrace stackTrace) {
+        completer.completeError(error, stackTrace);
+      },
+    );
     return operation.whenComplete(() {
       if (identical(_saveFuture, operation)) _saveFuture = null;
     });

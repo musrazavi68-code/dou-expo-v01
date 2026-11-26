@@ -296,24 +296,29 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  Future<void> _load(bool second) async {
   final x=await _picker.pickImage(source:ImageSource.gallery,imageQuality:100);
   if(x==null)return;
+  ui.Image? decoded;
   try{
    final bytes=await File(x.path).readAsBytes();
-   final im=await ExposureComposer.decode(bytes);
-   if(!mounted){im.dispose();return;}
+   decoded=await ExposureComposer.decode(bytes);
+   if(!mounted)return;
    final stamp=DateTime.now().microsecondsSinceEpoch;
    final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
+   if(!mounted)return;
    final layerId=second?'overlay_$stamp':'base_$stamp';
-   if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    final current=widget.session.document;
+   if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],
     activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'doubleExposure'}));
+   final image=decoded;
    setState((){
-    if(second){_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}
-    else{_base?.dispose();_base=im;}
+    if(second){_overlay?.dispose();_overlay=image;_offset=Offset.zero;_scale=1;}
+    else{_base?.dispose();_base=image;}
    });
-   if(!second){final c=_camera;_camera=null;_cameraOpen=false;_cameraReady=false;await c?.dispose();}
+   decoded=null;
+   if(!second){final camera=_camera;_camera=null;_cameraOpen=false;_cameraReady=false;await camera?.dispose();}
   }catch(e){_toast('Image load failed: '+e.toString());}
+  finally{decoded?.dispose();}
  }
  Future<void> _setCameraEv(double value) async {
   final c=_camera;if(c==null||!c.value.isInitialized)return;
@@ -323,28 +328,35 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  Future<void> _capture() async {
   final c=_camera;
   if(c==null||!c.value.isInitialized||_capturePending){_toast('Camera not ready');return;}
+  ui.Image? decoded;
   try{
    if(_selfTimer>0){setState(()=>_capturePending=true);_toast('Capture in '+_selfTimer.toString()+' seconds');await Future.delayed(Duration(seconds:_selfTimer));}
    if(!mounted||_camera!=c)return;
    final x=await c.takePicture();
    final bytes=await File(x.path).readAsBytes();
-   final im=await ExposureComposer.decode(bytes);
-   if(!mounted){im.dispose();return;}
+   decoded=await ExposureComposer.decode(bytes);
+   if(!mounted)return;
    final second=_base!=null;
    final stamp=DateTime.now().microsecondsSinceEpoch;
    final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
+   if(!mounted)return;
    final layerId=second?'overlay_$stamp':'base_$stamp';
-   if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    final current=widget.session.document;
+   if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
    widget.session.replace(current.copyWith(
     layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],
     activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'doubleExposure'}));
+   final image=decoded;
    setState((){
-    if(!second){_base=im;}else{_overlay?.dispose();_overlay=im;_offset=Offset.zero;_scale=1;}
+    if(!second){_base=image;}else{_overlay?.dispose();_overlay=image;_offset=Offset.zero;_scale=1;}
    });
+   decoded=null;
    _camera=null;_cameraOpen=false;_cameraReady=false;await c.dispose();
   }catch(e){_toast('Capture failed: '+e.toString());}
-  finally{if(mounted)setState(()=>_capturePending=false);}
+  finally{
+   decoded?.dispose();
+   if(mounted)setState(()=>_capturePending=false);
+  }
  }
  Future<void> _toggleCamera() async {
   if(_cameraOpen){final c=_camera;_camera=null;setState((){_cameraOpen=false;_cameraReady=false;});await c?.dispose();}

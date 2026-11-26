@@ -173,7 +173,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   // Notify session listeners only after the current widget-tree teardown unlocks.
   if(pendingSave){
    WidgetsBinding.instance.addPostFrameCallback((_){
-    if(widget.session.hasListeners)_flushEditorState();
+    if(!widget.session.isDisposed)_flushEditorState();
    });
   }
   widget.session.removeListener(_onProjectChanged);
@@ -267,6 +267,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  }
 
  void _flushEditorState() {
+  if(widget.session.isDisposed)return;
   _editorStateTimer?.cancel();
   _editorStateTimer=null;
   final current=widget.session.document;

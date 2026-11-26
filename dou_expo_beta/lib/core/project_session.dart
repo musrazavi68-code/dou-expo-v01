@@ -91,6 +91,7 @@ class ProjectSession extends ChangeNotifier {
   }
 
   void _markDirty() {
+    if (_disposed) throw StateError('ProjectSession is disposed');
     _revision++;
     _dirty = true;
     notifyListeners();
@@ -111,13 +112,16 @@ class ProjectSession extends ChangeNotifier {
   /// Clears only this in-memory session's undo/redo snapshots.
   /// The current project document and its persisted assets remain untouched.
   void clearHistory() {
+    if (_disposed) throw StateError('ProjectSession is disposed');
     _history.reset(document);
     notifyListeners();
   }
 
   /// Persists the asset before a manifest can refer to its stable path.
-  Future<String> addAsset(String fileName, Uint8List bytes) =>
-      _writeAsset(document.id, fileName, bytes);
+  Future<String> addAsset(String fileName, Uint8List bytes) {
+    if (_disposed) return Future<String>.error(StateError('ProjectSession is disposed'));
+    return _writeAsset(document.id, fileName, bytes);
+  }
 
   /// Concurrent save requests join one writer. If edits occur during IO, the
   /// writer persists the latest revision before completing.
@@ -155,6 +159,7 @@ class ProjectSession extends ChangeNotifier {
         final revisionAtStart = _revision;
         final snapshot = document;
         await _persist(snapshot);
+        if (_disposed) return;
         if (_revision == revisionAtStart && identical(document, snapshot)) {
           _dirty = false;
           notifyListeners();
@@ -172,7 +177,7 @@ class ProjectSession extends ChangeNotifier {
     if (_dirty || _saving) await save();
     final revisionAtStart = _revision;
     final loaded = await _restore(document.id);
-    if (loaded == null) return false;
+    if (_disposed || loaded == null) return false;
     if (_revision != revisionAtStart || _dirty || _saving) return false;
     if (loaded.id != document.id) {
       throw FormatException('Restored project identifier does not match the active id');
@@ -191,7 +196,7 @@ class ProjectSession extends ChangeNotifier {
     if (_dirty || _saving) await save();
     final revisionAtStart = _revision;
     final loaded = await _restore(id);
-    if (loaded == null) return false;
+    if (_disposed || loaded == null) return false;
     if (openToken != _openToken) return false;
     if (loaded.id != id) {
       throw FormatException('Restored project identifier does not match the requested id');

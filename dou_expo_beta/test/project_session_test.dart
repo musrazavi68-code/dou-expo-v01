@@ -57,12 +57,16 @@ void main() {
 
   test('save persists a newer edit that occurs while IO is in progress', () async {
     final gate = Completer<void>();
+    final firstPersistStarted = Completer<void>();
     final saved = <String>[];
     final session = ProjectSession.withBackend(
       initial: doc('Initial'),
       persist: (value) async {
         saved.add(value.name);
-        if (saved.length == 1) await gate.future;
+        if (saved.length == 1) {
+          if (!firstPersistStarted.isCompleted) firstPersistStarted.complete();
+          await gate.future;
+        }
       },
       restore: (_) async => null,
       writeAsset: (projectId, fileName, bytes) async => 'assets/test.png',
@@ -70,6 +74,7 @@ void main() {
 
     session.replace(doc('First edit'));
     final saving = session.save();
+    await firstPersistStarted.future;
     expect(session.isSaving, isTrue);
     session.replace(doc('Edit while saving'));
     gate.complete();
@@ -184,4 +189,3 @@ void main() {
     expect(receivedId, 'session-test');
   });
 }
-

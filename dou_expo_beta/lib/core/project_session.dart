@@ -72,6 +72,7 @@ class ProjectSession extends ChangeNotifier {
   int get revision => _revision;
 
   void replace(ProjectDocument next) {
+    if (_disposed) throw StateError('ProjectSession is disposed');
     if (next.id != document.id) {
       throw ArgumentError('A session cannot be replaced with another project id');
     }
@@ -98,12 +99,14 @@ class ProjectSession extends ChangeNotifier {
   }
 
   ProjectDocument? undo() {
+    if (_disposed) throw StateError('ProjectSession is disposed');
     final value = _history.undo();
     if (value != null) _markDirty();
     return value;
   }
 
   ProjectDocument? redo() {
+    if (_disposed) throw StateError('ProjectSession is disposed');
     final value = _history.redo();
     if (value != null) _markDirty();
     return value;
@@ -174,6 +177,7 @@ class ProjectSession extends ChangeNotifier {
   /// Restores the currently selected project's persisted snapshot, if present.
   /// Existing edits are saved first so recovery never discards dirty work.
   Future<bool> restoreCurrent() async {
+    if (_disposed) return false;
     if (_dirty || _saving) await save();
     final revisionAtStart = _revision;
     final loaded = await _restore(document.id);
@@ -191,6 +195,7 @@ class ProjectSession extends ChangeNotifier {
 
   /// A slow read must not overwrite edits made while it was in flight.
   Future<bool> open(String id) async {
+    if (_disposed) return false;
     if (id == document.id) return true;
     final openToken = ++_openToken;
     if (_dirty || _saving) await save();

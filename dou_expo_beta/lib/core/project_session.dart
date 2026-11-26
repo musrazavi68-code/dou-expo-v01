@@ -54,6 +54,9 @@ class ProjectSession extends ChangeNotifier {
   final Future<ProjectDocument?> Function(String) _restore;
   final Future<String> Function(String, String, List<int>) _writeAsset;
 
+  bool _disposed = false;
+  bool get isDisposed => _disposed;
+
   bool _dirty = false;
   bool _saving = false;
   int _revision = 0;
@@ -119,6 +122,7 @@ class ProjectSession extends ChangeNotifier {
   /// Concurrent save requests join one writer. If edits occur during IO, the
   /// writer persists the latest revision before completing.
   Future<void> save() {
+    if (_disposed) return Future<void>.error(StateError('ProjectSession is disposed'));
     final active = _saveFuture;
     if (active != null) return active;
     // Install the shared future before notifying listeners, because an
@@ -158,7 +162,7 @@ class ProjectSession extends ChangeNotifier {
       }
     } finally {
       _saving = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -200,5 +204,11 @@ class ProjectSession extends ChangeNotifier {
     _dirty = false;
     notifyListeners();
     return true;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

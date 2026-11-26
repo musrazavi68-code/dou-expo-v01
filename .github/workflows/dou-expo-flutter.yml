@@ -11,8 +11,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: dou-expo-beta-${{ github.ref }}-${{ github.run_id }}
-  cancel-in-progress: false
+  # Keep only the newest CI run for this branch; obsolete queued builds waste
+  # Android and macOS runner capacity and can publish stale artifacts.
+  group: dou-expo-beta-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   android-release:

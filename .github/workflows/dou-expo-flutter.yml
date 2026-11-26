@@ -99,7 +99,7 @@ jobs:
             "$APKSIGNER" verify --print-certs "$APK" | grep -Fqi "F5:AB:B7:F6:56:FE:95:F8:3E:68:C2:0A:7D:8A:CF:5A:A6:73:91:89:C6:ED:E2:47:C5:F6:18:46:83:04:AF:C5" || { echo "::error::APK signing certificate does not match the pinned Dou Expo beta key"; exit 1; }
           fi
           "$AAPT" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
-          grep -q "package: name='com.douexpo.dou_expo_beta' versionCode='4'" "$RUNNER_TEMP/apk-badging.txt"
+          grep -q "package: name='com.douexpo.dou_expo_beta' versionCode='5'" "$RUNNER_TEMP/apk-badging.txt"
           grep -q "sdkVersion:'24'" "$RUNNER_TEMP/apk-badging.txt"
           unzip -Z1 "$APK" | grep -q '^lib/arm64-v8a/libapp.so$'
           sha256sum "$APK"
@@ -112,16 +112,16 @@ jobs:
       - name: Package clean source ZIP
         run: |
           set -euo pipefail
-          zip -r dou_expo_beta_v0.2.3_source.zip dou_expo_beta \
+          zip -r dou_expo_beta_v0.2.4_source.zip dou_expo_beta \
             -x 'dou_expo_beta/build/*' 'dou_expo_beta/.dart_tool/*' \
                'dou_expo_beta/android/.gradle/*' 'dou_expo_beta/.flutter-plugins*'
-          test -s dou_expo_beta_v0.2.3_source.zip
-          sha256sum dou_expo_beta_v0.2.3_source.zip
+          test -s dou_expo_beta_v0.2.4_source.zip
+          sha256sum dou_expo_beta_v0.2.4_source.zip
       - name: Upload source ZIP
         uses: actions/upload-artifact@v6
         with:
-          name: Dou-Expo-Beta-v0.2.3-Source-ZIP
-          path: dou_expo_beta_v0.2.3_source.zip
+          name: Dou-Expo-Beta-v0.2.4-Source-ZIP
+          path: dou_expo_beta_v0.2.4_source.zip
           if-no-files-found: error
           retention-days: 90
       - name: Upload signed APK

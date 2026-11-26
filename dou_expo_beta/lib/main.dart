@@ -166,7 +166,24 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  static const _ratios=< (String,double) >[
   ('Original',0),('1:1',1),('3:2',1.5),('4:5',.8),('16:9',16/9)];
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);widget.session.addListener(_onProjectChanged);unawaited(_restoreFromProject());_startCamera();}
- @override void dispose(){_flushEditorState();widget.session.removeListener(_onProjectChanged);_restoreToken++;WidgetsBinding.instance.removeObserver(this);_camera?.dispose();_base?.dispose();_overlay?.dispose();super.dispose();}
+ @override void dispose(){
+  final pendingSave=_editorStateTimer?.isActive??false;
+  _editorStateTimer?.cancel();
+  _editorStateTimer=null;
+  // Notify session listeners only after the current widget-tree teardown unlocks.
+  if(pendingSave){
+   WidgetsBinding.instance.addPostFrameCallback((_){
+    if(widget.session.hasListeners)_flushEditorState();
+   });
+  }
+  widget.session.removeListener(_onProjectChanged);
+  _restoreToken++;
+  WidgetsBinding.instance.removeObserver(this);
+  _camera?.dispose();
+  _base?.dispose();
+  _overlay?.dispose();
+  super.dispose();
+ }
  void _onProjectChanged(){unawaited(_restoreFromProject());}
  Future<void> _restoreFromProject() async {
   final token=++_restoreToken;final project=widget.session.document;

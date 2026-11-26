@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 import 'dart:io';
@@ -270,7 +271,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    ...current.canvas,'lastEditedIn':'doubleExposure','doubleExposure':settings,
   };
   if(current.canvas['doubleExposure'] is Map &&
-     mapEquals(Map<String,Object?>.from(current.canvas['doubleExposure'] as Map),settings)) {
+     jsonEncode(Map<String,Object?>.from(current.canvas['doubleExposure'] as Map))==jsonEncode(settings)) {
    return;
   }
   widget.session.replace(current.copyWith(canvas:nextCanvas));
@@ -459,7 +460,19 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    ?current.activeLayerId
    :(remaining.isEmpty?null:remaining.last.id);
   final removedOverlay=_overlay;
-  _updateEditor((){
+  final rawSettings=current.canvas['doubleExposure'];
+  final settings=rawSettings is Map
+   ? Map<String,Object?>.from(rawSettings)
+   : <String,Object?>{};
+  settings.addAll({
+   'maskStrokes':<Map<String,Object?>>[],
+   'offsetX':0.0,'offsetY':0.0,'scale':1.0,'overlayExposure':0.15,
+   'maskMode':OverlayMaskMode.fullFrame.name,'maskFeather':0.0,
+  });
+  final nextCanvas=<String,Object?>{
+   ...current.canvas,'doubleExposure':settings,
+  };
+  setState((){
    _overlay=null;
    _loadedOverlayPath=null;
    _maskStrokes.clear();
@@ -467,9 +480,11 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    _offset=Offset.zero;
    _scale=1;
   });
+  _editorStateTimer?.cancel();
+  _editorStateTimer=null;
   // Release the native image handle when the second exposure is removed.
   removedOverlay?.dispose();
-  widget.session.replace(current.copyWith(layers:remaining,activeLayerId:activeId,clearActiveLayerId:activeId==null));
+  widget.session.replace(current.copyWith(canvas:nextCanvas,layers:remaining,activeLayerId:activeId,clearActiveLayerId:activeId==null));
  }
  void _reset(){_updateEditor((){_mix=.78;_baseEv=-.7;_overlayEv=.15;_contrast=1;_saturation=1;_filmEffect=FilmEffect.none;_effectAmount=.35;_scale=1;_offset=Offset.zero;_blend=0;_maskMode=OverlayMaskMode.fullFrame;_maskStrokes.clear();_activeMaskPath=null;});}
  @override Widget build(BuildContext context)=>Scaffold(
@@ -549,7 +564,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   child:Column(mainAxisSize:MainAxisSize.min,children:[
    if(_cameraReady)...[
     Row(children:[const SizedBox(width:105,child:Text('CAMERA EV',style:TextStyle(fontSize:9,color:Colors.white60))),Expanded(child:Slider(value:_cameraEv.clamp(-2,2),min:-2,max:2,divisions:16,onChanged:_setCameraEv)),SizedBox(width:42,child:Text(_cameraEv.toStringAsFixed(1)+' EV',style:const TextStyle(fontSize:9)))]),
-    Row(children:[const SizedBox(width:105,child:Text('SELF TIMER',style:TextStyle(fontSize:9,color:Colors.white60))),Expanded(child:Wrap(spacing:4,children:[0,3,5,10].map((v)=>ChoiceChip(label:Text(v==0?'OFF':v.toString()+'s'),selected:_selfTimer==v,onSelected:(_)=>_updateEditor(()=>_selfTimer=v))).toList()))]),
+    Row(children:[const SizedBox(width:105,child:Text('SELF TIMER',style:TextStyle(fontSize:9,color:Colors.white60))),Expanded(child:Wrap(spacing:4,children:[0,3,5,10].map((v)=>ChoiceChip(label:Text(v==0?'OFF':v.toString()+'s'),selected:_selfTimer==v,onSelected:(_)=>setState(()=>_selfTimer=v))).toList()))]),
     const Padding(padding:EdgeInsets.only(bottom:5),child:Text('Single shutter capture · one camera exposure per tap',style:TextStyle(fontSize:9,color:Colors.white54))),
    ],
    Row(children:[
@@ -629,13 +644,13 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     ]),
     Row(children:[
      const SizedBox(width:105,child:Text('MASK EDIT',style:TextStyle(fontSize:9,color:Colors.white60))),
-     Expanded(child:SwitchListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text(_maskEdit?'Brush active':'Edit mask'),value:_maskEdit,onChanged:(v)=>_updateEditor(()=>_maskEdit=v))),
+     Expanded(child:SwitchListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text(_maskEdit?'Brush active':'Edit mask'),value:_maskEdit,onChanged:(v)=>setState(()=>_maskEdit=v))),
      IconButton(tooltip:'Undo mask stroke',onPressed:_maskStrokes.isEmpty?null:()=>_updateEditor(()=>_maskStrokes.removeLast()),icon:const Icon(Icons.undo,size:18)),
      IconButton(tooltip:'Clear mask strokes',onPressed:_maskStrokes.isEmpty?null:()=>_updateEditor(()=>_maskStrokes.clear()),icon:const Icon(Icons.delete_outline,size:18)),
     ]),
     Row(children:[
-     Expanded(child:TextButton(onPressed:()=>_updateEditor(()=>_eraseBrush=false),child:Text('BRUSH',style:TextStyle(color:_eraseBrush?Colors.white54:const Color(0xFFFACC15))))),
-     Expanded(child:TextButton(onPressed:()=>_updateEditor(()=>_eraseBrush=true),child:Text('ERASER',style:TextStyle(color:_eraseBrush?const Color(0xFFFACC15):Colors.white54)))),
+     Expanded(child:TextButton(onPressed:()=>setState(()=>_eraseBrush=false),child:Text('BRUSH',style:TextStyle(color:_eraseBrush?Colors.white54:const Color(0xFFFACC15))))),
+     Expanded(child:TextButton(onPressed:()=>setState(()=>_eraseBrush=true),child:Text('ERASER',style:TextStyle(color:_eraseBrush?const Color(0xFFFACC15):Colors.white54)))),
     ]),
     _slider('BRUSH SIZE',_brushSize/.12,(v)=>_updateEditor(()=>_brushSize=v*.12),text:(_brushSize*100).round().toString()+'%'),
     _slider('EDGE FEATHER',_maskFeather,(v)=>_updateEditor(()=>_maskFeather=v)),

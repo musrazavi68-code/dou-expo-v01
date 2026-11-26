@@ -123,7 +123,9 @@ jobs:
           disable-animations: true
           script: |
             set -euo pipefail
-            APK="dou_expo_beta/build/app/outputs/flutter-apk/app-release.apk"
+            APK="${GITHUB_WORKSPACE}/dou_expo_beta/build/app/outputs/flutter-apk/app-release.apk"
+            echo "Checking APK at: $APK"
+            test -s "$APK" || { echo "::error::APK missing or empty at $APK"; find "${GITHUB_WORKSPACE}/dou_expo_beta/build" -maxdepth 6 -type f -name '*.apk' -print; exit 1; }
             adb install -r "$APK"
             adb shell monkey -p com.douexpo.dou_expo_beta 1
             for attempt in $(seq 1 30); do

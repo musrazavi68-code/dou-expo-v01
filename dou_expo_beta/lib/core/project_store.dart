@@ -141,19 +141,20 @@ class ProjectStore {
     final projects = <ProjectDocument>[];
     await for (final entity in root.list(followLinks: false)) {
       if (entity is! Directory) continue;
-      final file = File('${entity.path}/project.json');
-      if (!await file.exists()) continue;
+      final id = entity.uri.pathSegments.where((s) => s.isNotEmpty).last;
       try {
-        final project = ProjectDocument.decode(await file.readAsString());
-        if (project.id == entity.uri.pathSegments.where((s) => s.isNotEmpty).last) {
-          projects.add(project);
-        }
+        // Use load() so a valid backup manifest remains discoverable when the
+        // primary project.json is missing or damaged.
+        final project = await load(id);
+        if (project != null) projects.add(project);
       } on FormatException {
         // Keep damaged projects on disk; omit them from the browser.
       } on TypeError {
         // Keep incompatible metadata on disk; omit it from the browser.
       } on ArgumentError {
-        // Invalid identifiers or fields are not exposed as valid projects.
+        // Invalid directory identifiers or fields are not valid projects.
+      } on FileSystemException {
+        // A project may be concurrently removed or become temporarily unreadable.
       }
     }
     projects.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));

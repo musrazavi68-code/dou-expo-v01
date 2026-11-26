@@ -111,6 +111,10 @@ jobs:
           DOU_EXPO_KEY_PASSWORD: ${{ secrets.DOU_EXPO_KEY_PASSWORD }}
       - name: Install and launch APK on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Some hosted runners expose no KVM device. Permit the emulator's
+          # explicitly requested software (TCG) fallback instead of timing out.
+          ANDROID_I_WANT_MY_TCG: 'yes'
         with:
           api-level: 35
           target: google_apis

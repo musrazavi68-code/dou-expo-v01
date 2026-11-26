@@ -53,7 +53,7 @@ jobs:
         run: flutter test --reporter expanded
       - name: Build release APK
         working-directory: dou_expo_beta
-        run: flutter build apk --release
+        run: flutter build apk --release --target-platform android-arm,android-arm64,android-x64
       - name: Align, sign and verify APK
         id: sign
         working-directory: dou_expo_beta
@@ -109,6 +109,30 @@ jobs:
           DOU_EXPO_KEYSTORE_PASSWORD: ${{ secrets.DOU_EXPO_KEYSTORE_PASSWORD }}
           DOU_EXPO_KEY_ALIAS: ${{ secrets.DOU_EXPO_KEY_ALIAS }}
           DOU_EXPO_KEY_PASSWORD: ${{ secrets.DOU_EXPO_KEY_PASSWORD }}
+      - name: Install and launch APK on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            APK="dou_expo_beta/build/app/outputs/flutter-apk/app-release.apk"
+            adb install -r "$APK"
+            adb shell monkey -p com.douexpo.dou_expo_beta 1
+            for attempt in $(seq 1 30); do
+              if adb shell pidof com.douexpo.dou_expo_beta >/dev/null 2>&1; then
+                echo "Dou Expo installed and launched successfully on API 35 emulator."
+                exit 0
+              fi
+              sleep 2
+            done
+            adb logcat -d -t 1200
+            echo "::error::Dou Expo did not remain running after launch."
+            exit 1
+
       - name: Package clean source ZIP
         run: |
           set -euo pipefail

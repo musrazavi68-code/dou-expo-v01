@@ -1,114 +1,76 @@
-# Dou Expo — Architecture and Refactoring Plan
+# Dou Expo — Current Architecture, Risks and Delivery Plan
 
-## 1. Current implementation (verified against this branch)
+## 1. Current implementation
 
-The Flutter application lives in dou_expo_beta/.
+The Flutter app is in `dou_expo_beta/`; the legacy React Native app in `beta-app/` is preserved.
 
-- lib/main.dart: bootstrap, navigation shell, and complete Double Exposure editor state/UI. The editor owns camera, decoded images, blend controls, masks, stencil settings, render/export and share operations.
-- lib/studio_modes.dart: Ordinary Camera and Darkroom presentation plus camera/image-processing behavior.
-- lib/exposure_composer.dart: low-level image composition, preview painter, stencil paths and rendering primitives.
-- lib/core/project_document.dart: JSON project/layer DTOs.
-- lib/core/project_store.dart: app-private manifest and asset persistence.
-- lib/core/history_stack.dart: bounded generic undo/redo snapshots.
-- lib/core/project_session.dart: initial session façade; currently not injected into the three studio environments.
-- test/: composer, color, project DTO, session and shell widget tests.
+- `lib/main.dart`: app bootstrap, three-tab shell, editor UI/state, camera lifecycle, rendering/export and settings.
+- `lib/studio_modes.dart`: Ordinary Camera and Darkroom screens.
+- `lib/exposure_composer.dart`: composition painter, blend/render primitives and stencil geometry.
+- `lib/core/project_document.dart`: version-1 JSON project/layer model with recursive freezing of nested JSON maps/lists and validation.
+- `lib/core/project_session.dart`: shared project state, snapshot history, undo/redo, guarded restore/open and serialized save loop.
+- `lib/core/project_store.dart`: app-private project manifests and source assets, identifier/path validation, temporary-file writes and backup-manifest recovery.
+- `lib/core/autosave_coordinator.dart`: revision-observed debounced autosave and explicit lifecycle flush.
+- `test/`: project model/store/session, autosave, color pipeline, composer, pattern bank and shell navigation coverage.
 
-The three tabs are navigated by DouExpoShell, but each tab owns independent in-memory state. ProjectSession is not the source of truth for any of them. The editor's mask undo only removes the last stroke and does not cover other editor operations.
+`DouExpoShell` creates one `ProjectSession` and one `AutosaveCoordinator`, then injects the session into Ordinary Camera, Double Exposure and Darkroom. The session survives tab changes. Captured/imported source bytes are copied into project-private assets before the project manifest refers to them.
 
-## 2. Target architecture
+## 2. Verified CI state
 
-Use a feature-first structure with a small shared core. UI widgets must not write manifests, manage history directly, or call render internals.
+Latest successful run: https://github.com/musrazavi68-code/dou-expo-v01/actions/runs/45890652374
 
-```text
-dou_expo_beta/
-├── lib/
-│   ├── app/
-│   │   ├── dou_expo_app.dart              # MaterialApp, theme
-│   │   └── studio_shell.dart              # tab navigation + shared session owner
-│   ├── core/
-│   │   ├── domain/
-│   │   │   ├── project_document.dart      # immutable, versioned project/layer state
-│   │   │   └── edit_command.dart          # semantic edit operation contracts
-│   │   ├── application/
-│   │   │   ├── project_session.dart       # single source of truth
-│   │   │   ├── history_stack.dart         # bounded project-level history
-│   │   │   └── autosave_coordinator.dart  # debounced + lifecycle save orchestration
-│   │   └── data/
-│   │       ├── project_store.dart         # atomic manifest persistence
-│   │       └── project_asset_store.dart   # stable source/derived asset paths
-│   ├── features/
-│   │   ├── ordinary_camera/
-│   │   │   ├── presentation/              # camera screen and controls
-│   │   │   └── application/               # capture -> project layer use case
-│   │   ├── double_exposure/
-│   │   │   ├── presentation/              # editor widgets only
-│   │   │   └── application/               # blend, mask, transform, recipe commands
-│   │   └── darkroom/
-│   │       ├── presentation/              # develop controls
-│   │       └── application/               # non-destructive color adjustments
-│   ├── rendering/
-│   │   ├── exposure_renderer.dart         # deterministic final render entry point
-│   │   └── preview_painter.dart           # preview-only painter
-│   └── main.dart                          # bootstrap only
-└── test/
-    ├── core/
-    ├── features/
-    ├── rendering/
-    └── integration/
-```
+- Flutter analyze: passed.
+- Automated tests: passed (31 total, including the shell navigation widget test).
+- Android release APK build, alignment, signature and metadata checks: passed.
+- Android API 35 emulator install and process launch: passed in this run.
+- iOS release compilation without code signing: passed.
+- APK artifact uploaded.
+
+The APK used a one-run ephemeral test signing key because the four persistent signing secrets were absent. This is not a durable release identity and cannot update an installation signed by another key. A real-device camera/gallery test has not been performed by CI.
 
 ## 3. Ownership and data flow
 
-- StudioShell creates exactly one ProjectSession and injects it into Ordinary Camera, Double Exposure and Darkroom. Switching tabs must not recreate or discard the session.
-- A project is the canonical state: canvas/export profile, ordered layers, stable asset references, visibility/opacity/blend/transform/exposure, masks, stencil configuration, film recipe, and Darkroom adjustments.
-- Source image bytes are copied into app-private project assets before a manifest references them. Temporary picker/camera paths must never be persisted.
-- Features submit immutable project changes through ProjectSession.edit/replace. The session records one semantic history entry per completed user action, not per slider frame or pointer-move event.
-- AutosaveCoordinator observes ProjectSession revision changes directly, debounces writes, and exposes an explicit flush that propagates failures to the lifecycle owner. Background failures are reported through its error callback.
-- Preview and export use the same renderer/settings. Preview may be lower resolution; export must be deterministic at requested dimensions.
-- UI owns transient state only (open sheet, active gesture, camera controller, countdown). Camera resources are disposed/recreated on lifecycle changes; project content is not.
-- Autosave is debounced while editing, serialized/coalesced during writes, and flushed when the app becomes inactive/paused. A failed save leaves the session dirty and reports the error.
-- Undo/redo restores the complete project snapshot, including all feature settings. It is not a separate mask-only history.
+- The shell owns the single project session; all studio screens receive the same session.
+- Project documents store canvas settings, ordered layers, stable relative asset paths, layer visibility/opacity/blend/transform/exposure, masks and feature settings.
+- Source image bytes are copied to app-private storage; temporary picker/camera paths are not persisted as source references.
+- Features publish project snapshots through the session. The session owns history and persistence; autosave observes revision changes.
+- Autosave is debounced, save requests join a shared writer, and writes repeat if the project revision changes while persistence is in progress.
+- The shell flushes pending changes when the app becomes inactive/paused and exposes an explicit save action.
+- Project history is in-memory and scoped to the open app session; project documents/assets persist separately.
 
-## 4. Current gaps and risks
+## 4. Remaining risks and product gaps
 
-1. No shared runtime session: the three tabs do not receive ProjectSession; the current project model is effectively unused by the UI.
-2. Incomplete project schema: current layer DTOs can store common layer settings and masks, but do not formally model all editor and Darkroom settings, capture metadata, export profile, or schema migrations.
-3. Mutable nested JSON: final references in ProjectDocument/LayerDocument do not make nested maps/lists immutable. A snapshot can therefore change after it has entered history.
-4. Save coordination: ProjectSession currently rejects overlapping saves and an asynchronous open can replace state after the user has edited during the read.
-5. Asset safety/atomicity: project IDs and asset names need strict allow-list validation; asset writes should be atomic; read/list/delete should not create empty project directories.
-6. History semantics: editor controls mutate many independent fields directly. They need command boundaries and gesture coalescing before global undo can be correct.
-7. Feature coupling: main.dart mixes shell, editor state, camera management, rendering orchestration, export and UI. studio_modes.dart mixes two separate feature domains.
-8. Build validation: latest workflow execution has been pending/cancelled in the observed run history; there is no successful compile/test evidence or device verification.
+1. **Persistent release signing is blocked on owner-provided secrets.** The original private keystore and credentials are not present in the repository/CI environment. A public certificate fingerprint cannot recreate the private key. Until configured, CI artifacts remain test-only.
+2. **Physical-device validation remains outstanding.** Emulator success does not validate a particular phone's camera stack, gallery provider, permission behavior, storage behavior, or OEM-specific installation constraints.
+3. **Project schema is still version 1.** Canvas and feature settings are represented partly as JSON maps rather than fully typed feature-specific models; migration policy is not implemented beyond rejecting unsupported versions.
+4. **Editor state migration is incomplete.** Shared project/session and autosave are wired, but transient camera/editor UI state and every possible editing control should be audited for complete round-trip persistence and semantic undo behavior.
+5. **Renderer/export parity needs dedicated golden/integration tests.** The exported image is a canvas render, not a sensor-resolution, full-original-pixel compositor.
+6. **Camera controls are limited by the current plugin abstraction.** ISO and shutter speed are not exposed.
+7. **Launcher icon asset is missing.** `assets/icon/app_icon.png` must be supplied before generating final launcher icons.
 
-## 5. Ordered implementation plan
+## 5. Next delivery plan
 
-### Phase A — Stabilize the core (no UI migration yet)
-- Deep immutable project snapshots and strict model validation.
-- Serialized/coalesced save, revision-safe and latest-request-wins project open, safe atomic asset/manifest IO with backup recovery.
-- Unit tests for immutability, interrupted writes, concurrent edits/saves and asset validation.
+### P0 — Release identity and install path
+- Owner configures the original persistent keystore secrets.
+- Verify the resulting APK certificate fingerprint against the known release certificate.
+- Confirm update installation over the existing app without uninstalling or losing local data.
 
-### Phase B — Define the complete project schema
-- Add typed canvas/export/capture metadata and typed adjustment payloads.
-- Add schema migration strategy; never silently discard unknown versions.
-- Round-trip tests for every layer and feature setting.
+### P1 — Physical-device QA
+- Test install/update on the target Android device and capture the exact Package Installer/ADB error if installation fails.
+- Test camera permission grant/deny, front/rear switching, gallery import, export, share, background/foreground and low-storage behavior.
+- Test iOS camera/gallery permissions and export on a physical iPhone.
 
-### Phase C — Wire one shared session into the shell
-- Shell owns one session and autosave coordinator.
-- Ordinary Camera writes captured original assets and creates/replaces the base layer.
-- Double Exposure reads/writes layer, mask, stencil, blend and transform state.
-- Darkroom reads/writes non-destructive adjustment state and uses the common renderer.
-- Integration tests verify state survives tab changes and app restart.
+### P2 — Project integrity
+- Add typed canvas/export/capture/adjustment models and schema migrations.
+- Add integration tests for project round-trip across all tabs and app restart.
+- Audit each edit operation for one meaningful history entry and verify undo/redo restores all related settings.
+- Add interrupted-write, asset corruption and restore-recovery tests.
 
-### Phase D — Global history and autosave
-- Semantic commands for capture, add/remove/reorder layer, blend, transform, mask stroke, stencil, recipe, Darkroom adjustment and export profile.
-- Coalesce continuous sliders/gestures into one history entry.
-- Undo/redo tests across all three features.
-
-### Phase E — Renderer and release validation
-- One deterministic renderer for preview/export, bounded memory use and error handling.
-- Flutter analyze, unit/widget/integration tests, Android release build and APK verification.
-- Device smoke test remains a separate required sign-off.
+### P3 — Rendering and product finish
+- Add deterministic renderer golden tests and large-image memory/performance tests.
+- Decide whether full-original-resolution compositing is a product requirement.
+- Supply launcher icon artwork and verify generated Android/iOS icons.
 
 ## 6. Definition of done
 
-A phase is complete only when code, tests and the matching CI job pass. A source commit is not evidence of a successful build. A CI APK is not evidence of a real-device camera/gallery test. No incomplete feature may be described as finished.
+A phase is complete only when its code, automated tests and corresponding CI checks pass. A successful CI APK proves the tested build and emulator path, not physical-device compatibility or persistent update signing. No incomplete feature should be described as finished.

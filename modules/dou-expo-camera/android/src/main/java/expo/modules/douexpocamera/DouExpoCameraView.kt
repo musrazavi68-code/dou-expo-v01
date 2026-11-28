@@ -48,6 +48,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var selectedFocusDiopters = -1f
   private var selectedAwb = -1
   private var selectedZoom = 0f
+  private var selectedTorch = false
   private var requestedCapture = 0
   private var opening = false
 
@@ -67,6 +68,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   fun setFocusDistance(value: Float) { selectedFocusDiopters = value; updateRepeating() }
   fun setAwbMode(value: Int) { selectedAwb = value; updateRepeating() }
   fun setZoom(value: Float) { selectedZoom = value.coerceIn(0f, 1f); updateRepeating() }
+  fun setTorch(value: Boolean) { selectedTorch = value; updateRepeating() }
 
   fun requestCapture(value: Int) {
     if (value <= 0 || value == requestedCapture) return
@@ -185,6 +187,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   }
 
   private fun applyManualControls(builder: CaptureRequest.Builder) {
+    builder.set(CaptureRequest.FLASH_MODE, if (selectedTorch) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF)
     if (manualSensor && (selectedIso > 0 || selectedExposureNs > 0L)) {
       val isoBounds = isoRange
       val exposureBounds = exposureRange

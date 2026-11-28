@@ -7,6 +7,7 @@ import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
+import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Size
@@ -48,6 +49,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var selectedAwb = -1
   private var selectedZoom = 0f
   private var requestedCapture = 0
+  private var opening = false
 
   init {
     addView(preview, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -84,6 +86,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   }
 
   private fun openCamera() {
+    if (device != null || opening || !preview.isAvailable) return
     if (context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
       onCameraError(mapOf("message" to "Camera permission is not granted"))
       return
@@ -103,19 +106,23 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
       manualSensor = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
       manager.openCamera(id, object : CameraDevice.StateCallback() {
         override fun onOpened(camera: CameraDevice) {
+          opening = false
           device = camera
           createPreviewSession()
         }
         override fun onDisconnected(camera: CameraDevice) {
+          opening = false
           camera.close(); if (device === camera) device = null
           onCameraError(mapOf("message" to "Camera disconnected"))
         }
         override fun onError(camera: CameraDevice, error: Int) {
+          opening = false
           camera.close(); if (device === camera) device = null
           onCameraError(mapOf("message" to "Camera2 error: $error"))
         }
       }, handler)
     } catch (e: Exception) {
+      opening = false
       onCameraError(mapOf("message" to (e.message ?: "Unable to open Camera2")))
     }
   }
@@ -124,14 +131,20 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
     val camera = device ?: return
     val texture = preview.surfaceTexture ?: return
     try {
-      val sizes = cameraManager!!.getCameraCharacteristics(cameraId!!).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-        ?.getOutputSizes(SurfaceTexture::class.java)
-      val size = sizes?.filter { it.width <= 1920 && it.height <= 1080 }?.maxByOrNull { it.width * it.height }
+      val streamMap = cameraManager!!.getCameraCharacteristics(cameraId!!).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        ?: throw IllegalStateException("Camera output formats are unavailable")
+      val previewSizes = streamMap.getOutputSizes(SurfaceTexture::class.java)
+      val size = previewSizes?.filter { it.width <= 1920 && it.height <= 1080 }?.maxByOrNull { it.width * it.height }
+        ?: previewSizes?.maxByOrNull { it.width * it.height }
         ?: Size(1280, 720)
+      val jpegSizes = streamMap.getOutputSizes(android.graphics.ImageFormat.JPEG)
+      val jpegSize = jpegSizes?.filter { it.width.toLong() * it.height.toLong() <= 12_000_000L }
+        ?.maxByOrNull { it.width * it.height } ?: jpegSizes?.maxByOrNull { it.width * it.height }
+        ?: size
       texture.setDefaultBufferSize(size.width, size.height)
       val previewSurface = Surface(texture)
       jpegReader?.close()
-      jpegReader = ImageReader.newInstance(size.width, size.height, android.graphics.ImageFormat.JPEG, 2)
+      jpegReader = ImageReader.newInstance(jpegSize.width, jpegSize.height, android.graphics.ImageFormat.JPEG, 2)
       jpegReader?.setOnImageAvailableListener({ reader ->
         var image: Image? = null
         try {
@@ -142,7 +155,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
           val file = File(context.cacheDir, "dou-shot-${System.currentTimeMillis()}.jpg")
           FileOutputStream(file).use { it.write(bytes) }
           capturePending.set(false)
-          onPhotoCaptured(mapOf("uri" to file.toURI().toString(), "width" to image.width, "height" to image.height))
+          onPhotoCaptured(mapOf("uri" to Uri.fromFile(file).toString(), "width" to image.width, "height" to image.height))
         } catch (e: Exception) {
           capturePending.set(false)
           onCameraError(mapOf("message" to (e.message ?: "Photo capture failed")))
@@ -172,9 +185,13 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   }
 
   private fun applyManualControls(builder: CaptureRequest.Builder) {
-    if (manualSensor && selectedIso > 0 && selectedExposureNs > 0L) {
-      val iso = isoRange?.let { selectedIso.coerceIn(it.lower, it.upper) } ?: selectedIso
-      val exposure = exposureRange?.let { selectedExposureNs.coerceIn(it.lower, it.upper) } ?: selectedExposureNs
+    if (manualSensor && (selectedIso > 0 || selectedExposureNs > 0L)) {
+      val isoBounds = isoRange
+      val exposureBounds = exposureRange
+      val defaultIso = isoBounds?.let { (it.lower + it.upper) / 2 } ?: 100
+      val defaultExposure = exposureBounds?.let { 10_000_000L.coerceIn(it.lower, it.upper) } ?: 10_000_000L
+      val iso = isoBounds?.let { (if (selectedIso > 0) selectedIso else defaultIso).coerceIn(it.lower, it.upper) } ?: defaultIso
+      val exposure = exposureBounds?.let { (if (selectedExposureNs > 0L) selectedExposureNs else defaultExposure).coerceIn(it.lower, it.upper) } ?: defaultExposure
       builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
       builder.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
       builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposure)
@@ -254,6 +271,8 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
     try { jpegReader?.close() } catch (_: Exception) {}
     jpegReader = null
     capturePending.set(false)
+    opening = false
+    cameraId = null
   }
 
   override fun onAttachedToWindow() {

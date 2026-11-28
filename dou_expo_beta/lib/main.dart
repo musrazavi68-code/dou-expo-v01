@@ -18,6 +18,30 @@ import 'core/project_session.dart';
 import 'core/autosave_coordinator.dart';
 import 'core/project_store.dart';
 
+
+Uint8List _yuv420ToRgba(Map<String,Object> args) {
+ final width=args['width'] as int, height=args['height'] as int;
+ final y=args['y'] as Uint8List, u=args['u'] as Uint8List, v=args['v'] as Uint8List;
+ final yRow=args['yRow'] as int, uRow=args['uRow'] as int, vRow=args['vRow'] as int;
+ final uPixel=args['uPixel'] as int, vPixel=args['vPixel'] as int;
+ final out=Uint8List(width*height*4);
+ for(var row=0;row<height;row++){
+  final yStart=row*yRow, uvRow=row>>1;
+  for(var col=0;col<width;col++){
+   final yy=y[yStart+col].toDouble();
+   final ui=uvRow*uRow+(col>>1)*uPixel, vi=uvRow*vRow+(col>>1)*vPixel;
+   final uu=u[ui].toDouble()-128, vv=v[vi].toDouble()-128;
+   final c=math.max(0,yy-16);
+   final r=(1.164*c+1.596*vv).round().clamp(0,255);
+   final g=(1.164*c-.392*uu-.813*vv).round().clamp(0,255);
+   final b=(1.164*c+2.017*uu).round().clamp(0,255);
+   final o=(row*width+col)*4;
+   out[o]=r;out[o+1]=g;out[o+2]=b;out[o+3]=255;
+  }
+ }
+ return out;
+}
+
 void main() {
  WidgetsFlutterBinding.ensureInitialized();
  runApp(const DouExpoApp());
@@ -140,7 +164,9 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
  final GlobalKey _previewKey=GlobalKey();
  CameraController? _camera;
  List<CameraDescription> _cameras=[];
- ui.Image? _base,_overlay;
+ ui.Image? _base,_overlay,_liveCameraFrame;
+ DateTime _lastLiveFrame=DateTime.fromMillisecondsSinceEpoch(0);
+ bool _processingLiveFrame=false;
  bool _cameraOpen=false,_cameraReady=false,_busy=false,_capturePending=false,_cameraStarting=false;
  double _cameraEv=0;
  int _selfTimer=0;
@@ -183,6 +209,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   _camera?.dispose();
   _base?.dispose();
   _overlay?.dispose();
+  _liveCameraFrame?.dispose();
   super.dispose();
  }
  void _onProjectChanged(){unawaited(_restoreFromProject());}
@@ -285,12 +312,38 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    candidate=CameraController(_cameras[_cameraIndex % _cameras.length],ResolutionPreset.high,enableAudio:false);
    await candidate.initialize();
    if(!mounted||!_cameraOpen){await candidate.dispose();return;}
+   await candidate.startImageStream(_onCameraImage);
+   if(!mounted||!_cameraOpen){await candidate.dispose();return;}
    setState(()=>_camera=candidate);
    setState(()=>_cameraReady=true);
   }catch(e){await candidate?.dispose();_cameraOpen=false;_toast('Camera: '+e.toString());}
   finally{_cameraStarting=false;}
  }
  void _toast(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
+ Future<void> _onCameraImage(CameraImage frame) async {
+  final now=DateTime.now();
+  if(_processingLiveFrame||now.difference(_lastLiveFrame).inMilliseconds<250||frame.planes.length<3)return;
+  if(frame.format.group!=ImageFormatGroup.yuv420)return;
+  _processingLiveFrame=true;_lastLiveFrame=now;
+  try{
+   final p=frame.planes;
+   final rgba=await compute(_yuv420ToRgba,{
+    'width':frame.width,'height':frame.height,
+    'y':p[0].bytes,'u':p[1].bytes,'v':p[2].bytes,
+    'yRow':p[0].bytesPerRow,'uRow':p[1].bytesPerRow,'vRow':p[2].bytesPerRow,
+    'uPixel':p[1].bytesPerPixel??1,'vPixel':p[2].bytesPerPixel??1,
+   });
+   final done=Completer<ui.Image>();
+   ui.decodeImageFromPixels(rgba,frame.width,frame.height,ui.PixelFormat.rgba8888,done.complete);
+   final image=await done.future;
+   if(!mounted||!_cameraOpen){image.dispose();return;}
+   final old=_liveCameraFrame;
+   setState(()=>_liveCameraFrame=image);
+   old?.dispose();
+  }catch(error){debugPrint('Live camera compositor frame failed: $error');}
+  finally{_processingLiveFrame=false;}
+ }
+
 
  Timer? _editorStateTimer;
 
@@ -372,6 +425,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
   try{
    if(_selfTimer>0){setState(()=>_capturePending=true);_toast('Capture in '+_selfTimer.toString()+' seconds');await Future.delayed(Duration(seconds:_selfTimer));}
    if(!mounted||_camera!=c)return;
+   final wasStreaming=c.value.isStreamingImages;
+   if(wasStreaming)await c.stopImageStream();
    final x=await c.takePicture();
    final bytes=await File(x.path).readAsBytes();
    decoded=await ExposureComposer.decode(bytes);
@@ -391,7 +446,7 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
     if(!second){_base=image;}else{_overlay?.dispose();_overlay=image;_offset=Offset.zero;_scale=1;}
    });
    decoded=null;
-   _camera=null;_cameraOpen=false;_cameraReady=false;await c.dispose();
+   if(wasStreaming&&mounted&&_camera==c&&_cameraOpen){await c.startImageStream(_onCameraImage);}
   }catch(e){_toast('Capture failed: '+e.toString());}
   finally{
    decoded?.dispose();
@@ -415,6 +470,8 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    _cameraIndex=(_cameraIndex+1)%_cameras.length;
    candidate=CameraController(_cameras[_cameraIndex],ResolutionPreset.high,enableAudio:false);
    await candidate.initialize();
+   if(!mounted||!_cameraOpen){await candidate.dispose();return;}
+   await candidate.startImageStream(_onCameraImage);
    if(!mounted||!_cameraOpen){await candidate.dispose();return;}
    setState(()=>_camera=candidate);
    setState(()=>_cameraReady=true);
@@ -598,10 +655,10 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
      }
     },
     onScaleEnd:(d){_activeMaskPath=null;},
-    child:CustomPaint(key:_previewKey,size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:_overlay,
+    child:CustomPaint(key:_previewKey,size:Size.infinite,painter:ExposurePreviewPainter(base:b,overlay:(_cameraOpen&&_cameraReady&&b!=null)?(_liveCameraFrame??_overlay):_overlay,
      blendMode:_modes[_blend].$2,mix:_mix,baseEv:_baseEv,overlayEv:_overlayEv,
      overlayOffset:_offset,overlayScale:_scale,maskMode:_maskMode,maskFeather:_maskFeather*40,maskStrokes:List<MaskStroke>.unmodifiable(_maskStrokes),stencil:_stencil,stencilFillMode:_stencilFill,stencilTint:_stencilTint,contrast:_contrast,saturation:_saturation,filmEffect:_filmEffect,effectAmount:_effectAmount),
-     child:_cameraOpen && _cameraReady && _camera!=null
+     child:_cameraOpen && _cameraReady && _camera!=null && b==null
       ? CameraPreview(_camera!)
       :b==null?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
        const Icon(Icons.add_photo_alternate_outlined,size:48,color:Colors.white54),

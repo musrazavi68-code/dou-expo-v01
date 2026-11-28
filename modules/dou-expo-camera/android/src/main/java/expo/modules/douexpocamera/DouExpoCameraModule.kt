@@ -86,6 +86,17 @@ class DouExpoCameraModule : Module() {
       } catch (_: Exception) { false }
     }
 
+    View(DouExpoCameraView::class) {
+      Events("onPhotoCaptured", "onCameraError", "onCameraReady")
+      Prop("facing") { view: DouExpoCameraView, value: String -> view.setFacing(value) }
+      Prop("iso") { view: DouExpoCameraView, value: Int -> view.setIso(value) }
+      Prop("exposureTimeNs") { view: DouExpoCameraView, value: Long -> view.setExposureTimeNs(value) }
+      Prop("focusDistance") { view: DouExpoCameraView, value: Float -> view.setFocusDistance(value) }
+      Prop("awbMode") { view: DouExpoCameraView, value: Int -> view.setAwbMode(value) }
+      Prop("zoom") { view: DouExpoCameraView, value: Float -> view.setZoom(value) }
+      Prop("captureRequest") { view: DouExpoCameraView, value: Int -> view.requestCapture(value) }
+    }
+
     OnDestroy { tone?.release(); tone = null }
   }
 }

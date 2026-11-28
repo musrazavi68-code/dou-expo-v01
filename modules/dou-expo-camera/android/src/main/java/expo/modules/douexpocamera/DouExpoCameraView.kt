@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.SurfaceTexture
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Color
+import android.view.View
 import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
@@ -29,6 +33,10 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   val onCameraReady by EventDispatcher()
 
   private val preview = TextureView(context)
+  private val peakingOverlay = FocusPeakingOverlay(context)
+  private var yuvReader: ImageReader? = null
+  private var previewSurface: Surface? = null
+  private var peakingEnabled = false
   private var cameraManager: CameraManager? = null
   private var device: CameraDevice? = null
   private var session: CameraCaptureSession? = null
@@ -52,9 +60,11 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var selectedTorch = false
   private var requestedCapture = 0
   private var opening = false
+  private var yuvOutputActive = false
 
   init {
     addView(preview, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+    addView(peakingOverlay, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     preview.surfaceTextureListener = this
     cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
   }
@@ -70,6 +80,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   fun setAwbMode(value: Int) { selectedAwb = value; updateRepeating() }
   fun setZoom(value: Float) { selectedZoom = value.coerceIn(0f, 1f); updateRepeating() }
   fun setTorch(value: Boolean) { selectedTorch = value; updateRepeating() }
+  fun setFocusPeaking(value: Boolean) { peakingEnabled = value; peakingOverlay.visibility = if (value) View.VISIBLE else View.GONE }
 
   fun requestCapture(value: Int) {
     if (value <= 0 || value == requestedCapture) return
@@ -146,32 +157,56 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
         ?.maxByOrNull { it.width * it.height } ?: jpegSizes?.maxByOrNull { it.width * it.height }
         ?: size
       texture.setDefaultBufferSize(size.width, size.height)
-      val previewSurface = Surface(texture)
+      val newPreviewSurface = Surface(texture)
+      previewSurface?.release()
+      previewSurface = newPreviewSurface
       jpegReader?.close()
       jpegReader = ImageReader.newInstance(jpegSize.width, jpegSize.height, android.graphics.ImageFormat.JPEG, 2)
       jpegReader?.setOnImageAvailableListener({ reader ->
         var image: Image? = null
         try {
-          image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
-          val buffer = image.planes[0].buffer
+          image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+          val capturedImage = image
+          val buffer = capturedImage.planes[0].buffer
           val bytes = ByteArray(buffer.remaining())
           buffer.get(bytes)
           val file = File(context.cacheDir, "dou-shot-${System.currentTimeMillis()}.jpg")
           FileOutputStream(file).use { it.write(bytes) }
           capturePending.set(false)
-          onPhotoCaptured(mapOf("uri" to Uri.fromFile(file).toString(), "width" to image.width, "height" to image.height))
+          onPhotoCaptured(mapOf("uri" to Uri.fromFile(file).toString(), "width" to capturedImage.width, "height" to capturedImage.height))
         } catch (e: Exception) {
           capturePending.set(false)
           onCameraError(mapOf("message" to (e.message ?: "Photo capture failed")))
         } finally { image?.close() }
       }, handler)
-      camera.createCaptureSession(listOf(previewSurface, jpegReader!!.surface), object : CameraCaptureSession.StateCallback() {
+      yuvReader?.close()
+      yuvReader = null
+      yuvOutputActive = false
+      if (peakingEnabled) {
+        try {
+          yuvReader = ImageReader.newInstance(640, 480, android.graphics.ImageFormat.YUV_420_888, 2).also { reader ->
+            reader.setOnImageAvailableListener({ source ->
+              var frame: Image? = null
+              try {
+                frame = source.acquireLatestImage()
+                if (frame != null) peakingOverlay.updateFromLuma(frame!!)
+              } catch (_: Exception) {
+              } finally { frame?.close() }
+            }, handler)
+          }
+          yuvOutputActive = true
+        } catch (_: Exception) { yuvReader = null; yuvOutputActive = false }
+      }
+      val outputSurfaces = mutableListOf(previewSurface, jpegReader!!.surface)
+      if (yuvOutputActive) outputSurfaces.add(yuvReader!!.surface)
+      camera.createCaptureSession(outputSurfaces, object : CameraCaptureSession.StateCallback() {
         override fun onConfigured(configured: CameraCaptureSession) {
           if (device !== camera) { configured.close(); return }
           session = configured
           try {
             previewRequest = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
               addTarget(previewSurface)
+              if (yuvOutputActive) addTarget(yuvReader!!.surface)
               set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
             }
             applyManualControls(previewRequest!!)
@@ -180,7 +215,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
           } catch (e: Exception) { onCameraError(mapOf("message" to (e.message ?: "Preview request failed"))) }
         }
         override fun onConfigureFailed(failed: CameraCaptureSession) {
-          onCameraError(mapOf("message" to "Camera2 preview session configuration failed"))
+          if (yuvOutputActive) { yuvReader?.close(); yuvReader = null; yuvOutputActive = false; createPreviewSession() } else onCameraError(mapOf("message" to "Camera2 preview session configuration failed"))
         }
       }, handler)
     } catch (e: Exception) {
@@ -275,6 +310,10 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
     device = null
     try { jpegReader?.close() } catch (_: Exception) {}
     jpegReader = null
+    try { yuvReader?.close() } catch (_: Exception) {}
+    yuvReader = null
+    try { previewSurface?.release() } catch (_: Exception) {}
+    previewSurface = null
     capturePending.set(false)
     opening = false
     cameraId = null
@@ -297,4 +336,31 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
   override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean { closeCamera(); return true }
   override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+
+  private class FocusPeakingOverlay(context: Context) : View(context) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 48, 48); style = Paint.Style.FILL; alpha = 220 }
+    @Volatile private var points: FloatArray = FloatArray(0)
+    fun updateFromLuma(image: Image) {
+      if (image.planes.isEmpty()) return
+      val plane = image.planes[0]; val data = plane.buffer
+      val w = image.width; val h = image.height; val row = plane.rowStride; val pixel = plane.pixelStride
+      val out = ArrayList<Float>(256); val step = 8
+      for (y in step until h - step step step) for (x in step until w - step step step) {
+        val index = y * row + x * pixel
+        val left = data.get(index - pixel).toInt() and 255
+        val right = data.get(index + pixel).toInt() and 255
+        val up = data.get(index - row).toInt() and 255
+        val down = data.get(index + row).toInt() and 255
+        if (kotlin.math.abs(right - left) + kotlin.math.abs(down - up) > 105) { out.add(x.toFloat() / w); out.add(y.toFloat() / h) }
+      }
+      val result = FloatArray(out.size)
+      for (i in out.indices) result[i] = out[i]
+      points = result; postInvalidateOnAnimation()
+    }
+    override fun onDraw(canvas: Canvas) {
+      super.onDraw(canvas); val current = points; val radius = 2f * resources.displayMetrics.density
+      var i = 0
+      while (i + 1 < current.size) { canvas.drawCircle(current[i] * width, current[i + 1] * height, radius, paint); i += 2 }
+    }
+  }
 }

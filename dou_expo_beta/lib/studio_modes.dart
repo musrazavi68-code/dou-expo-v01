@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'dart:math' as math;
+import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show compute;
 import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
@@ -51,11 +54,15 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  int _timerSeconds=0,_countdown=0;
  double _ev=0,_minEv=-2,_maxEv=2,_zoom=1,_maxZoom=4;
  bool _cameraInitializing=false,_appActive=true;
+ final AudioPlayer _zoomPlayer=AudioPlayer();
+ DateTime _lastZoomSound=DateTime.fromMillisecondsSinceEpoch(0);
+ double _joystickStartZoom=1,_joystickStartEv=0;
+ Offset _joystickOrigin=Offset.zero;
  String _film='COLOR';
  Uint8List? _lastShotBytes;
  String? _loadedOrdinaryPath;int _restoreToken=0;
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);widget.session.addListener(_onProjectChanged);_restoreOrdinary();_init();}
- @override void dispose(){widget.session.removeListener(_onProjectChanged);_restoreToken++;WidgetsBinding.instance.removeObserver(this);_camera?.dispose();super.dispose();}
+ @override void dispose(){widget.session.removeListener(_onProjectChanged);_restoreToken++;WidgetsBinding.instance.removeObserver(this);_camera?.dispose();unawaited(_zoomPlayer.dispose());super.dispose();}
  void _onProjectChanged(){_restoreOrdinary();}
  Future<void> _restoreOrdinary() async {
   final token=++_restoreToken;final project=widget.session.document;
@@ -95,7 +102,34 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
   finally{_cameraInitializing=false;}
  }
  Future<void> _setEv(double v) async {final c=_camera;if(c==null)return;try{final a=await c.setExposureOffset(v);if(mounted)setState(()=>_ev=a);}catch(_){}}
- Future<void> _setZoom(double v) async {final c=_camera;if(c==null)return;try{await c.setZoomLevel(v);if(mounted)setState(()=>_zoom=v);}catch(_){}}
+ Uint8List _zoomMotorWave({required bool zoomIn,required double intensity}) {
+  const rate=22050;const samples=rate~/7;final data=ByteData(44+samples*2);
+  void ascii(int offset,String value){for(var i=0;i<value.length;i++){data.setUint8(offset+i,value.codeUnitAt(i));}}
+  ascii(0,'RIFF');data.setUint32(4,36+samples*2,Endian.little);ascii(8,'WAVE');ascii(12,'fmt ');
+  data.setUint32(16,16,Endian.little);data.setUint16(20,1,Endian.little);data.setUint16(22,1,Endian.little);
+  data.setUint32(24,rate,Endian.little);data.setUint32(28,rate*2,Endian.little);data.setUint16(32,2,Endian.little);
+  data.setUint16(34,16,Endian.little);ascii(36,'data');data.setUint32(40,samples*2,Endian.little);
+  final start=zoomIn?210.0:145.0,end=zoomIn?145.0:95.0;
+  for(var i=0;i<samples;i++){
+   final t=i/samples;final freq=start+(end-start)*t;
+   final envelope=math.pow(math.sin(math.pi*t),.65).toDouble();
+   final fundamental=math.sin(2*math.pi*(start*t+(end-start)*t*t/2)*samples/rate);
+   final harmonic=.28*math.sin(2*math.pi*(start*t+(end-start)*t*t/2)*2*samples/rate);
+   final value=((fundamental+harmonic)*envelope*intensity*5000).round().clamp(-32768,32767);
+   data.setInt16(44+i*2,value,Endian.little);
+  }
+  return data.buffer.asUint8List();
+ }
+ Future<void> _playZoomMotor(double previous,double next) async {
+  final now=DateTime.now();
+  if((next-previous).abs()<.045||now.difference(_lastZoomSound).inMilliseconds<95)return;
+  _lastZoomSound=now;
+  try{
+   await _zoomPlayer.stop();
+   await _zoomPlayer.play(BytesSource(_zoomMotorWave(zoomIn:next>previous,intensity:(.22+(next-1)/math.max(1,_maxZoom-1)*.35).clamp(.18,.6))));
+  }catch(error){debugPrint('Zoom motor sound unavailable: $error');}
+ }
+ Future<void> _setZoom(double v) async {final c=_camera;if(c==null)return;try{final next=v.clamp(1,_maxZoom).toDouble();await c.setZoomLevel(next);if(mounted){setState(()=>_zoom=next);unawaited(_playZoomMotor(_zoom,next));}}catch(_){}}
  Future<void> _focus(Offset p, Size size) async {final c=_camera;if(c==null)return;try{await c.setFocusPoint(Offset(p.dx/size.width,p.dy/size.height));await c.setExposurePoint(Offset(p.dx/size.width,p.dy/size.height));}catch(_){}}
  Future<Uint8List> _applyFilm(Uint8List bytes,String recipe)=>compute(_developOrdinaryPhoto,{'bytes':bytes,'recipe':recipe});
  Future<void> _capture() async {
@@ -145,7 +179,6 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    Expanded(flex:7,child:Padding(padding:const EdgeInsets.fromLTRB(12,6,12,8),child:ClipRRect(borderRadius:BorderRadius.circular(18),
     child:LayoutBuilder(builder:(ctx,box)=>GestureDetector(
      onTapDown:(d)=>_focus(d.localPosition,box.biggest),
-     onVerticalDragUpdate:(d)=>_setZoom((_zoom-d.delta.dy*.01).clamp(1,_maxZoom).toDouble()),
      child:Stack(fit:StackFit.expand,children:[
       if(_ready&&_camera!=null)CameraPreview(_camera!) else const ColoredBox(color:Color(0xFF24201E),child:Center(child:CircularProgressIndicator(color:_yellow))),
       const IgnorePointer(child:Center(child:Icon(Icons.add,size:34,color:Colors.white70))),
@@ -159,9 +192,22 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
     Row(children:[const SizedBox(width:42,child:Text('ZOOM',style:TextStyle(color:_yellow))),Expanded(child:Slider(min:1,max:math.max(1.01,_maxZoom),value:_zoom.clamp(1,math.max(1.01,_maxZoom)),onChanged:_setZoom)),Text('${_zoom.toStringAsFixed(1)}x',style:const TextStyle(fontSize:11))]),
     const Text('Exposure compensation and tap-to-focus · ISO and shutter are not yet exposed by this camera driver',style:TextStyle(fontSize:10,color:Colors.white54)),
    ])),
+   const Padding(padding:EdgeInsets.only(top:2),child:Text('SHUTTER JOYSTICK · TAP TO SHOOT · DRAG UP/DOWN TO ZOOM · LEFT/RIGHT FOR EV',textAlign:TextAlign.center,style:TextStyle(fontSize:8,color:Colors.white38,letterSpacing:.5))),
    Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
     GestureDetector(onTap:()=>_lastShotBytes==null?null:showDialog(context:context,builder:(ctx)=>Dialog(child:Image.memory(_lastShotBytes!,fit:BoxFit.contain))),child:Container(width:58,height:58,decoration:BoxDecoration(color:const Color(0xFF292422),borderRadius:BorderRadius.circular(9),image:_lastShotBytes==null?null:DecorationImage(image:MemoryImage(_lastShotBytes!),fit:BoxFit.cover)),child:_lastShotBytes==null?const Icon(Icons.photo_library_outlined,color:Colors.white70):null)),
-    GestureDetector(onTap:_capture,child:Container(width:86,height:86,decoration:const BoxDecoration(color:Colors.white,shape:BoxShape.circle),child:Center(child:_busy?const CircularProgressIndicator(color:_ink):const Icon(Icons.add,size:38,color:_ink)))),
+    GestureDetector(
+     onTap:_capture,
+     onPanStart:(d){_joystickOrigin=d.localPosition;_joystickStartZoom=_zoom;_joystickStartEv=_ev;},
+     onPanUpdate:(d){
+      final delta=d.localPosition-_joystickOrigin;
+      if(delta.dy.abs()>=delta.dx.abs()){
+       _setZoom((_joystickStartZoom-delta.dy*.035).clamp(1,_maxZoom).toDouble());
+      }else if(_manual){
+       _setEv((_joystickStartEv+delta.dx*.035).clamp(_minEv,_maxEv).toDouble());
+      }
+     },
+     child:Container(width:86,height:86,decoration:const BoxDecoration(color:Colors.white,shape:BoxShape.circle),child:Center(child:_busy?const CircularProgressIndicator(color:_ink):const Icon(Icons.add,size:38,color:_ink)))),
+
     Column(children:[const Text('FILM / TIMER',style:TextStyle(fontSize:9,color:Colors.white54)),DropdownButton<String>(value:_film,dropdownColor:_ink,underline:const SizedBox(),items:const ['COLOR','MONO','WARM','COOL'].map((x)=>DropdownMenuItem(value:x,child:Text(x,style:const TextStyle(fontSize:11)))).toList(),onChanged:(v){if(v!=null)setState(()=>_film=v);}),DropdownButton<int>(value:_timerSeconds,dropdownColor:_ink,underline:const SizedBox(),items:const [0,3,5,10].map((v)=>DropdownMenuItem(value:v,child:Text(v==0?'OFF':'${v}s',style:const TextStyle(fontSize:10)))).toList(),onChanged:(v){if(v!=null)setState(()=>_timerSeconds=v);})])
    ]))
   ])),

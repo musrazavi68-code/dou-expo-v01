@@ -1,7 +1,7 @@
 name: Dou Expo 2.3.0 Android Build
 on:
   push:
-    branches: [dou-expo-v2.3.0-rebuild]
+    branches: [dou-expo-v2.3.0-rebuild, duo-shot-android-v4]
     tags: ['v2.3.0']
   workflow_dispatch:
 permissions:

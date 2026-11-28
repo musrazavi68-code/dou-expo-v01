@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   camera: ^0.12.2
+  audioplayers: ^6.5.1
   image_picker: ^1.1.2
   path_provider: ^2.1.6
   gal: ^3.0.1

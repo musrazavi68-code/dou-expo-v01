@@ -80,7 +80,16 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   fun setAwbMode(value: Int) { selectedAwb = value; updateRepeating() }
   fun setZoom(value: Float) { selectedZoom = value.coerceIn(0f, 1f); updateRepeating() }
   fun setTorch(value: Boolean) { selectedTorch = value; updateRepeating() }
-  fun setFocusPeaking(value: Boolean) { peakingEnabled = value; peakingOverlay.visibility = if (value) View.VISIBLE else View.GONE }
+  fun setFocusPeaking(value: Boolean) {
+    if (peakingEnabled == value) return
+    peakingEnabled = value
+    peakingOverlay.visibility = if (value) View.VISIBLE else View.GONE
+    handler?.post {
+      try { session?.close() } catch (_: Exception) {}
+      session = null
+      createPreviewSession()
+    }
+  }
 
   fun requestCapture(value: Int) {
     if (value <= 0 || value == requestedCapture) return
@@ -197,7 +206,8 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
           yuvOutputActive = true
         } catch (_: Exception) { yuvReader = null; yuvOutputActive = false }
       }
-      val outputSurfaces = mutableListOf(previewSurface, jpegReader!!.surface)
+      val previewOutput = previewSurface ?: throw IllegalStateException("Preview surface is unavailable")
+      val outputSurfaces = mutableListOf(previewOutput, jpegReader!!.surface)
       if (yuvOutputActive) outputSurfaces.add(yuvReader!!.surface)
       camera.createCaptureSession(outputSurfaces, object : CameraCaptureSession.StateCallback() {
         override fun onConfigured(configured: CameraCaptureSession) {
@@ -205,7 +215,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
           session = configured
           try {
             previewRequest = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
-              addTarget(previewSurface)
+              addTarget(previewOutput)
               if (yuvOutputActive) addTarget(yuvReader!!.surface)
               set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
             }
@@ -288,6 +298,13 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
         val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
           addTarget(reader.surface)
           set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+          val characteristics = cameraManager?.getCameraCharacteristics(cameraId ?: "")
+          val sensorOrientation = characteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+          val rotation = (context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay.rotation
+          val deviceDegrees = when (rotation) { Surface.ROTATION_90 -> 90; Surface.ROTATION_180 -> 180; Surface.ROTATION_270 -> 270; else -> 0 }
+          val facing = characteristics?.get(CameraCharacteristics.LENS_FACING)
+          val jpegOrientation = if (facing == CameraCharacteristics.LENS_FACING_FRONT) (sensorOrientation + deviceDegrees) % 360 else (sensorOrientation - deviceDegrees + 360) % 360
+          set(CaptureRequest.JPEG_ORIENTATION, jpegOrientation)
           applyManualControls(this)
         }
         activeSession.capture(request.build(), object : CameraCaptureSession.CaptureCallback() {

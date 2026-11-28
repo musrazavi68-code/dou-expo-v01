@@ -39,6 +39,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var previewRequest: CaptureRequest.Builder? = null
   private val capturePending = AtomicBoolean(false)
   private var manualSensor = false
+  private var flashAvailable = false
   private var isoRange: android.util.Range<Int>? = null
   private var exposureRange: android.util.Range<Long>? = null
   private var focusMax = 0f
@@ -104,6 +105,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
       isoRange = chars.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
       exposureRange = chars.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
       focusMax = chars.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+      flashAvailable = chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) ?: false
       val caps = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)?.toList() ?: emptyList()
       manualSensor = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
       manager.openCamera(id, object : CameraDevice.StateCallback() {
@@ -187,7 +189,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   }
 
   private fun applyManualControls(builder: CaptureRequest.Builder) {
-    builder.set(CaptureRequest.FLASH_MODE, if (selectedTorch) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF)
+    builder.set(CaptureRequest.FLASH_MODE, if (selectedTorch && flashAvailable) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF)
     if (manualSensor && (selectedIso > 0 || selectedExposureNs > 0L)) {
       val isoBounds = isoRange
       val exposureBounds = exposureRange

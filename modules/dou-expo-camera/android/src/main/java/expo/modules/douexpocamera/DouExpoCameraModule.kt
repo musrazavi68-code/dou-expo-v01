@@ -95,6 +95,7 @@ class DouExpoCameraModule : Module() {
       Prop("awbMode") { view: DouExpoCameraView, value: Int -> view.setAwbMode(value) }
       Prop("zoom") { view: DouExpoCameraView, value: Float -> view.setZoom(value) }
       Prop("torch") { view: DouExpoCameraView, value: Boolean -> view.setTorch(value) }
+      Prop("focusPeaking") { view: DouExpoCameraView, value: Boolean -> view.setFocusPeaking(value) }
       Prop("captureRequest") { view: DouExpoCameraView, value: Int -> view.requestCapture(value) }
     }
 

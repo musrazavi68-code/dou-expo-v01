@@ -5,6 +5,13 @@ on:
     paths:
       - 'dou_expo_beta/**'
       - '.github/workflows/dou-expo-flutter.yml'
+  pull_request:
+    branches: [dou-expo-flutter-beta-0.1.0]
+    paths:
+      - 'dou_expo_beta/**'
+      - '.github/workflows/dou-expo-flutter.yml'
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:

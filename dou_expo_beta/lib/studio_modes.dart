@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
-import 'dart:math' as math;
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show compute;
@@ -111,7 +110,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
   data.setUint16(34,16,Endian.little);ascii(36,'data');data.setUint32(40,samples*2,Endian.little);
   final start=zoomIn?210.0:145.0,end=zoomIn?145.0:95.0;
   for(var i=0;i<samples;i++){
-   final t=i/samples;final freq=start+(end-start)*t;
+   final t=i/samples;
    final envelope=math.pow(math.sin(math.pi*t),.65).toDouble();
    final fundamental=math.sin(2*math.pi*(start*t+(end-start)*t*t/2)*samples/rate);
    final harmonic=.28*math.sin(2*math.pi*(start*t+(end-start)*t*t/2)*2*samples/rate);

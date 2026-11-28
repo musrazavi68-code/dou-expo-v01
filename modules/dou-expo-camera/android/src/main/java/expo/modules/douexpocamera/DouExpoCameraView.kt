@@ -61,6 +61,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   private var requestedCapture = 0
   private var opening = false
   private var yuvOutputActive = false
+  private var peakingTemporarilyUnavailable = false
 
   init {
     addView(preview, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -83,6 +84,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
   fun setFocusPeaking(value: Boolean) {
     if (peakingEnabled == value) return
     peakingEnabled = value
+    peakingTemporarilyUnavailable = false
     peakingOverlay.visibility = if (value) View.VISIBLE else View.GONE
     handler?.post {
       try { session?.close() } catch (_: Exception) {}
@@ -191,7 +193,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
       yuvReader?.close()
       yuvReader = null
       yuvOutputActive = false
-      if (peakingEnabled) {
+      if (peakingEnabled && !peakingTemporarilyUnavailable) {
         try {
           yuvReader = ImageReader.newInstance(640, 480, android.graphics.ImageFormat.YUV_420_888, 2).also { reader ->
             reader.setOnImageAvailableListener({ source ->
@@ -225,7 +227,7 @@ class DouExpoCameraView(context: Context, appContext: AppContext) : ExpoView(con
           } catch (e: Exception) { onCameraError(mapOf("message" to (e.message ?: "Preview request failed"))) }
         }
         override fun onConfigureFailed(failed: CameraCaptureSession) {
-          if (yuvOutputActive) { yuvReader?.close(); yuvReader = null; yuvOutputActive = false; createPreviewSession() } else onCameraError(mapOf("message" to "Camera2 preview session configuration failed"))
+          if (yuvOutputActive) { yuvReader?.close(); yuvReader = null; yuvOutputActive = false; peakingTemporarilyUnavailable = true; peakingOverlay.visibility = View.GONE; createPreviewSession() } else onCameraError(mapOf("message" to "Camera2 preview session configuration failed"))
         }
       }, handler)
     } catch (e: Exception) {

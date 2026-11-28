@@ -56,7 +56,7 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
  bool _cameraInitializing=false,_appActive=true;
  final AudioPlayer _zoomPlayer=AudioPlayer();
  DateTime _lastZoomSound=DateTime.fromMillisecondsSinceEpoch(0);
- double _joystickStartZoom=1,_joystickStartEv=0;
+ double _joystickStartZoom=1,_joystickStartEv=0,_pinchStartZoom=1;
  Offset _joystickOrigin=Offset.zero;
  String _film='COLOR';
  Uint8List? _lastShotBytes;
@@ -179,6 +179,8 @@ class _OrdinaryCameraScreenState extends State<OrdinaryCameraScreen> with Widget
    Expanded(flex:7,child:Padding(padding:const EdgeInsets.fromLTRB(12,6,12,8),child:ClipRRect(borderRadius:BorderRadius.circular(18),
     child:LayoutBuilder(builder:(ctx,box)=>GestureDetector(
      onTapDown:(d)=>_focus(d.localPosition,box.biggest),
+     onScaleStart:(d){if(d.pointerCount>1)_pinchStartZoom=_zoom;},
+     onScaleUpdate:(d){if(d.pointerCount>1)_setZoom((_pinchStartZoom*d.scale).clamp(1,_maxZoom).toDouble());},
      child:Stack(fit:StackFit.expand,children:[
       if(_ready&&_camera!=null)CameraPreview(_camera!) else const ColoredBox(color:Color(0xFF24201E),child:Center(child:CircularProgressIndicator(color:_yellow))),
       const IgnorePointer(child:Center(child:Icon(Icons.add,size:34,color:Colors.white70))),

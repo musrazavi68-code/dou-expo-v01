@@ -433,14 +433,32 @@ class _DouExpoEditorState extends State<DouExpoEditor> with WidgetsBindingObserv
    if(!mounted)return;
    final second=_base!=null;
    final stamp=DateTime.now().microsecondsSinceEpoch;
+   final current=widget.session.document;
+   String? flattenedBasePath;
+   String? flattenedBaseId;
+   if(second&&_overlay!=null){
+    // Bake all previous exposures into the next base so each new shutter
+    // extends the composite rather than replacing the preceding exposure.
+    final flattened=await _render(0,0);
+    final flattenedImage=await ExposureComposer.decode(flattened);
+    final baseAsset=await widget.session.addAsset('composite_$stamp.png',flattened);
+    flattenedBasePath=baseAsset;
+    flattenedBaseId='composite_$stamp';
+    _base?.dispose();
+    _base=flattenedImage;
+    _loadedBasePath=baseAsset;
+   }
    final assetPath=await widget.session.addAsset(second?'overlay_$stamp.jpg':'base_$stamp.jpg',bytes);
    if(!mounted)return;
    final layerId=second?'overlay_$stamp':'base_$stamp';
-   final current=widget.session.document;
    if(second){_loadedOverlayPath=assetPath;}else{_loadedBasePath=assetPath;}
+   final layers=[...current.layers];
+   if(flattenedBasePath!=null&&flattenedBaseId!=null){
+    layers.add(LayerDocument(id:flattenedBaseId,name:'Base photograph',assetPath:flattenedBasePath));
+   }
+   layers.add(LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal'));
    widget.session.replace(current.copyWith(
-    layers:[...current.layers,LayerDocument(id:layerId,name:second?'Second exposure':'Base photograph',assetPath:assetPath,blendMode:second?_modes[_blend].$1:'normal')],
-    activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'doubleExposure'}));
+    layers:layers,activeLayerId:layerId,canvas:{...current.canvas,'lastEditedIn':'doubleExposure'}));
    final image=decoded;
    setState((){
     if(!second){_base=image;}else{_overlay?.dispose();_overlay=image;_offset=Offset.zero;_scale=1;}
